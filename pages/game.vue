@@ -6,7 +6,9 @@ import { useTutorial } from '~/composables/useTutorial'
 import { useLevel } from '~/composables/useLevel'
 
 const route = useRoute()
-const isTutorialMode = computed(() => route.query.level === 'tutorial')
+const levelId = computed(() => route.query.level as string || null)
+const isTutorialMode = computed(() => levelId.value === 'tutorial')
+const isSlayMonsterMode = computed(() => levelId.value === 'slayMonster')
 
 const showHelp = ref(false)
 const showModeSelector = ref(false)
@@ -48,18 +50,108 @@ const {
 } = useTutorial()
 
 // 关卡系统
-const { levelStatus, startLevel, endLevel } = useLevel()
+const { 
+  state: levelState,
+  currentConfig: levelConfig,
+  levelStatus, 
+  startLevel, 
+  endLevel,
+  spawnEnemy,
+  updateEnemies,
+  checkHit,
+  damageEnemy,
+  updateTime
+} = useLevel()
+
+// 关卡结束状态
+const showLevelResult = ref(false)
+const levelResult = ref<{ score: number; kills: number; maxCombo: number; success: boolean } | null>(null)
+
+// 敌人生成定时器
+let spawnTimer: ReturnType<typeof setInterval> | null = null
+let gameLoopTimer: ReturnType<typeof setInterval> | null = null
 
 // 教程模式初始化
 onMounted(() => {
   if (isTutorialMode.value) {
     startTutorial()
     startLevel('tutorial')
-    // 生成第一个目标
     nextTick(() => {
       generateTarget(window.innerWidth, window.innerHeight)
     })
   }
+  
+  // 御剑斩妖模式初始化
+  if (isSlayMonsterMode.value) {
+    startLevel('slayMonster')
+    
+    // 敌人生成定时器
+    spawnTimer = setInterval(() => {
+      if (levelState.value.isPlaying && !levelState.value.isPaused) {
+        spawnEnemy(window.innerWidth, window.innerHeight)
+      }
+    }, 1500)
+    
+    // 游戏循环（更新时间）
+    gameLoopTimer = setInterval(() => {
+      if (levelState.value.isPlaying && !levelState.value.isPaused) {
+        updateTime(0.1)  // 每100ms更新一次
+        
+        // 检查时间是否结束
+        if (levelState.value.timeRemaining <= 0) {
+          handleLevelEnd()
+        }
+      }
+    }, 100)
+  }
+})
+
+// 关卡结束处理
+const handleLevelEnd = () => {
+  const result = endLevel(levelState.value.score >= (levelConfig.value?.targetScore || 0))
+  levelResult.value = result
+  showLevelResult.value = true
+  
+  // 清理定时器
+  if (spawnTimer) clearInterval(spawnTimer)
+  if (gameLoopTimer) clearInterval(gameLoopTimer)
+}
+
+// 敌人被击中处理
+const handleEnemyHit = (enemyId: string) => {
+  if (isSlayMonsterMode.value) {
+    damageEnemy(enemyId, 100)  // 一击必杀
+  }
+}
+
+// 重试关卡
+const retryLevel = () => {
+  showLevelResult.value = false
+  levelResult.value = null
+  
+  if (isSlayMonsterMode.value) {
+    startLevel('slayMonster')
+    
+    spawnTimer = setInterval(() => {
+      if (levelState.value.isPlaying && !levelState.value.isPaused) {
+        spawnEnemy(window.innerWidth, window.innerHeight)
+      }
+    }, 1500)
+    
+    gameLoopTimer = setInterval(() => {
+      if (levelState.value.isPlaying && !levelState.value.isPaused) {
+        updateTime(0.1)
+        if (levelState.value.timeRemaining <= 0) {
+          handleLevelEnd()
+        }
+      }
+    }, 100)
+  }
+}
+
+onUnmounted(() => {
+  if (spawnTimer) clearInterval(spawnTimer)
+  if (gameLoopTimer) clearInterval(gameLoopTimer)
 })
 
 // 监听教程完成，解锁下一关
@@ -161,12 +253,15 @@ watch(gestureState, (newState) => {
       class="canvas-layer" 
       :gesture-mode="controlMode === 'gesture'"
       :tutorial-mode="isTutorialMode"
+      :level-mode="isSlayMonsterMode"
+      :enemies="levelState.enemies"
       :target-position="targetPosition"
       :show-target="showTarget"
       @sword-move="(pos: { x: number; y: number }) => handleTutorialAction('move', pos)"
       @sword-slash="() => handleTutorialAction('slash')"
       @sword-charge="(data: { chargeLevel: number }) => handleTutorialAction('charge', data)"
       @sword-thrust="() => handleTutorialAction('thrust')"
+      @enemy-hit="handleEnemyHit"
     />
     
     <!-- 教程引导面板 -->
@@ -196,6 +291,52 @@ watch(gestureState, (newState) => {
           <li>✅ 瞬影突刺 - 瞬移突刺</li>
         </ul>
         <NuxtLink to="/levels" class="continue-btn ink-card">进入江湖</NuxtLink>
+      </div>
+    </div>
+    
+    <!-- 御剑斩妖关卡UI -->
+    <div v-if="isSlayMonsterMode && levelState.isPlaying" class="level-hud">
+      <div class="hud-item time">
+        <span class="hud-label">⏱️</span>
+        <span class="hud-value">{{ Math.ceil(levelState.timeRemaining) }}s</span>
+      </div>
+      <div class="hud-item score">
+        <span class="hud-label">🎯</span>
+        <span class="hud-value">{{ levelState.score }}</span>
+      </div>
+      <div class="hud-item kills">
+        <span class="hud-label">💀</span>
+        <span class="hud-value">{{ levelState.kills }}</span>
+      </div>
+      <div class="hud-item combo" v-if="levelState.combo > 1">
+        <span class="hud-value combo-text">{{ levelState.combo }}连击!</span>
+      </div>
+    </div>
+    
+    <!-- 关卡结算面板 -->
+    <div v-if="showLevelResult" class="level-result-overlay">
+      <div class="result-panel ink-card">
+        <h2 :class="levelResult?.success ? 'success' : 'fail'">
+          {{ levelResult?.success ? '🎉 关卡通过！' : '💔 挑战失败' }}
+        </h2>
+        <div class="result-stats">
+          <div class="stat-item">
+            <span class="stat-label">得分</span>
+            <span class="stat-value">{{ levelResult?.score }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">击杀</span>
+            <span class="stat-value">{{ levelResult?.kills }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">最高连击</span>
+            <span class="stat-value">{{ levelResult?.maxCombo }}</span>
+          </div>
+        </div>
+        <div class="result-actions">
+          <NuxtLink to="/levels" class="result-btn ink-card">返回关卡</NuxtLink>
+          <button class="result-btn ink-card retry" @click="retryLevel">再来一次</button>
+        </div>
       </div>
     </div>
     
@@ -706,5 +847,129 @@ watch(gestureState, (newState) => {
   font-size: 16px;
   text-decoration: none;
   color: #d4a574;
+}
+
+/* 关卡HUD */
+.level-hud {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 24px;
+  z-index: 100;
+}
+
+.hud-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 8px;
+  border: 1px solid rgba(212, 165, 116, 0.3);
+}
+
+.hud-label {
+  font-size: 18px;
+}
+
+.hud-value {
+  font-family: 'ZCOOL XiaoWei', serif;
+  font-size: 20px;
+  color: #f5f5f5;
+}
+
+.hud-item.time .hud-value {
+  color: #FFD700;
+}
+
+.hud-item.combo {
+  background: rgba(196, 30, 58, 0.8);
+  border-color: #C41E3A;
+}
+
+.combo-text {
+  color: #FFD700;
+  animation: pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* 关卡结算面板 */
+.level-result-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 300;
+}
+
+.result-panel {
+  padding: 40px 60px;
+  text-align: center;
+  min-width: 360px;
+}
+
+.result-panel h2 {
+  font-family: 'ZCOOL XiaoWei', serif;
+  font-size: 32px;
+  margin: 0 0 24px 0;
+}
+
+.result-panel h2.success {
+  color: #4CAF50;
+}
+
+.result-panel h2.fail {
+  color: #C41E3A;
+}
+
+.result-stats {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  margin-bottom: 32px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-label {
+  display: block;
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-family: 'ZCOOL XiaoWei', serif;
+  font-size: 28px;
+  color: #d4a574;
+}
+
+.result-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.result-btn {
+  padding: 12px 24px;
+  font-size: 16px;
+  text-decoration: none;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+}
+
+.result-btn.retry {
+  color: #4CAF50;
 }
 </style>

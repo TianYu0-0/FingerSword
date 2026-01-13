@@ -5,10 +5,14 @@ import { useSound } from '~/composables/useSound'
 import { useTouch } from '~/composables/useTouch'
 import type { Sword, InkTrail } from '~/types/game'
 
+import type { Enemy } from '~/composables/useLevel'
+
 // Props
 const props = defineProps<{
   gestureMode?: boolean
   tutorialMode?: boolean
+  levelMode?: boolean
+  enemies?: Enemy[]
   targetPosition?: { x: number; y: number }
   showTarget?: boolean
 }>()
@@ -19,6 +23,7 @@ const emit = defineEmits<{
   'sword-slash': []
   'sword-charge': [data: { chargeLevel: number }]
   'sword-thrust': []
+  'enemy-hit': [enemyId: string]
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -456,10 +461,93 @@ const render = (timestamp: number) => {
   drawGatherSwords(ctx)
   drawShield(ctx)
   drawTutorialTarget(ctx)  // 教程目标
+  drawEnemies(ctx)  // 关卡敌人
+  checkEnemyCollision()  // 碰撞检测
   drawSword(ctx)
   drawComboIndicator(ctx)
   
   animationFrameId = requestAnimationFrame(render)
+}
+
+// 绘制敌人
+const drawEnemies = (ctx: CanvasRenderingContext2D) => {
+  if (!props.levelMode || !props.enemies) return
+  
+  props.enemies.forEach(enemy => {
+    if (!enemy.isAlive) return
+    
+    const { x, y } = enemy.position
+    const size = enemy.size
+    
+    ctx.save()
+    
+    if (enemy.type === 'monster') {
+      // 妖怪：红色圆形 + 眼睛
+      const gradient = ctx.createRadialGradient(x, y, 0, x, y, size)
+      gradient.addColorStop(0, '#8B0000')
+      gradient.addColorStop(0.7, '#C41E3A')
+      gradient.addColorStop(1, '#4A0000')
+      
+      ctx.beginPath()
+      ctx.arc(x, y, size / 2, 0, Math.PI * 2)
+      ctx.fillStyle = gradient
+      ctx.fill()
+      
+      // 眼睛
+      ctx.fillStyle = '#FFD700'
+      ctx.beginPath()
+      ctx.arc(x - size * 0.15, y - size * 0.1, size * 0.1, 0, Math.PI * 2)
+      ctx.arc(x + size * 0.15, y - size * 0.1, size * 0.1, 0, Math.PI * 2)
+      ctx.fill()
+      
+      // 嘴巴
+      ctx.strokeStyle = '#FFD700'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.arc(x, y + size * 0.1, size * 0.2, 0, Math.PI)
+      ctx.stroke()
+    } else {
+      // 靶子：同心圆
+      ctx.beginPath()
+      ctx.arc(x, y, size / 2, 0, Math.PI * 2)
+      ctx.fillStyle = '#8B4513'
+      ctx.fill()
+      
+      ctx.beginPath()
+      ctx.arc(x, y, size / 3, 0, Math.PI * 2)
+      ctx.fillStyle = '#C41E3A'
+      ctx.fill()
+      
+      ctx.beginPath()
+      ctx.arc(x, y, size / 6, 0, Math.PI * 2)
+      ctx.fillStyle = '#FFD700'
+      ctx.fill()
+    }
+    
+    ctx.restore()
+  })
+}
+
+// 检测剑与敌人碰撞
+const checkEnemyCollision = () => {
+  if (!props.levelMode || !props.enemies) return
+  
+  const swordPos = sword.value.position
+  const swordSize = 40  // 剑的碰撞半径
+  
+  props.enemies.forEach(enemy => {
+    if (!enemy.isAlive) return
+    
+    const dx = enemy.position.x - swordPos.x
+    const dy = enemy.position.y - swordPos.y
+    const distance = Math.sqrt(dx * dx + dy * dy)
+    
+    if (distance < (enemy.size + swordSize) / 2) {
+      emit('enemy-hit', enemy.id)
+      emitInkSplash(enemy.position.x, enemy.position.y, 15)
+      playSound('slash')
+    }
+  })
 }
 
 // 绘制教程目标
