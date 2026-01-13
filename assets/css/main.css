@@ -1,0 +1,77 @@
+/* 水墨风格基础样式 */
+html {
+  background-color: #F5F0E6;
+  color: #1A1A1A;
+}
+
+body {
+  font-family: 'ZCOOL XiaoWei', serif;
+  background: linear-gradient(180deg, rgba(245, 240, 230, 0.95) 0%, rgba(245, 240, 230, 0.85) 100%);
+  min-height: 100vh;
+}
+
+/* 按钮 - 印章风格 */
+.btn-seal {
+  position: relative;
+  padding: 0.75rem 1.5rem;
+  background-color: #C41E3A;
+  color: #F5F0E6;
+  font-family: 'ZCOOL XiaoWei', serif;
+  font-size: 1.125rem;
+  border: 2px solid rgba(196, 30, 58, 0.8);
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+.btn-seal:hover {
+  background-color: rgba(196, 30, 58, 0.9);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.btn-seal:active {
+  transform: scale(0.95);
+}
+
+/* 水墨标题 */
+.ink-title {
+  font-family: 'ZCOOL XiaoWei', serif;
+  color: #1A1A1A;
+  text-shadow: 2px 2px 4px rgba(26, 26, 26, 0.2);
+}
+
+/* 水墨卡片 */
+.ink-card {
+  background-color: rgba(245, 240, 230, 0.8);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(107, 107, 107, 0.2);
+  box-shadow: 0 10px 15px -3px rgba(26, 26, 26, 0.1);
+  border-radius: 2px;
+}
+
+/* 游戏画布容器 */
+.game-canvas-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: linear-gradient(to bottom, rgba(245, 240, 230, 0.9), rgba(245, 240, 230, 0.7));
+}
+
+/* 动画效果 */
+.animate-ink-fade-in {
+  animation: inkFadeIn 0.8s ease-out forwards;
+}
+
+@keyframes inkFadeIn {
+  0% { opacity: 0; filter: blur(4px); }
+  100% { opacity: 1; filter: blur(0); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
