@@ -272,8 +272,9 @@ const drawEffects = (ctx: CanvasRenderingContext2D) => {
       ctx.rotate(flyAngle + Math.PI / 2)
       
       if (swordImage.value) {
-        const imgSize = 40
-        ctx.drawImage(swordImage.value, -imgSize / 2, -imgSize / 2, imgSize, imgSize)
+        const imgWidth = 16
+        const imgHeight = 82  // 保持宽高比
+        ctx.drawImage(swordImage.value, -imgWidth / 2, -imgHeight / 2, imgWidth, imgHeight)
       } else {
         // 备用绘制
         ctx.fillStyle = CONFIG.inkColor
@@ -352,10 +353,11 @@ const drawSword = (ctx: CanvasRenderingContext2D) => {
     ctx.shadowBlur = 10 + s.chargeLevel * 20
   }
   
-  // 使用图片绘制剑
+  // 使用图片绘制剑（图片分辨率 235x1212，剑尖向上）
   if (swordImage.value) {
-    const imgSize = 80
-    ctx.drawImage(swordImage.value, -imgSize / 2, -imgSize / 2, imgSize, imgSize)
+    const imgWidth = 30
+    const imgHeight = 155  // 保持宽高比 235:1212 ≈ 1:5.16
+    ctx.drawImage(swordImage.value, -imgWidth / 2, -imgHeight / 2, imgWidth, imgHeight)
   } else {
     // 备用：绘制简单剑形
     const gradient = ctx.createLinearGradient(-CONFIG.swordWidth / 2, 0, CONFIG.swordWidth / 2, 0)
@@ -480,10 +482,11 @@ const drawGatherSwords = (ctx: CanvasRenderingContext2D) => {
     ctx.rotate(s.angle)
     ctx.globalAlpha = 0.8
     
-    // 使用图片绘制剑
+    // 使用图片绘制剑（图片分辨率 235x1212，剑尖向上）
     if (swordImage.value) {
-      const imgSize = 50
-      ctx.drawImage(swordImage.value, -imgSize / 2, -imgSize / 2, imgSize, imgSize)
+      const imgWidth = 20
+      const imgHeight = 103  // 保持宽高比
+      ctx.drawImage(swordImage.value, -imgWidth / 2, -imgHeight / 2, imgWidth, imgHeight)
     } else {
       // 备用绘制
       ctx.fillStyle = CONFIG.inkColor
