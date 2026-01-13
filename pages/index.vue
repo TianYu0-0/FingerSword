@@ -25,17 +25,18 @@ const handleStart = () => {
     </div>
 
     <!-- 主内容 -->
-    <main class="main-content" :class="{ 'animate-ink-fade-in': !isStarting, 'fade-out': isStarting }">
-      <h1 class="ink-title title">指尖剑仙</h1>
-      <p class="slogan">以指御剑，斩妖除魔</p>
+    <main class="main-content" :class="{ 'fade-out': isStarting }">
+      <!-- 水墨动画标题 -->
+      <h1 class="ink-title title ink-brush-animate">指尖剑仙</h1>
+      <p class="slogan ink-brush-animate delay-1">以指御剑，斩妖除魔</p>
       
       <!-- 装饰剑图案 -->
-      <div class="sword-icon animate-float">
+      <div class="sword-icon ink-brush-animate delay-2 animate-float">
         <img src="/images/sword.jpg" alt="仙剑" class="sword-image" />
         <div class="sword-glow"></div>
       </div>
       
-      <button class="btn-seal" @click="handleStart">开始修炼</button>
+      <button class="btn-seal ink-brush-animate delay-3" @click="handleStart">开始修炼</button>
       <NuxtLink to="/tutorial" class="tutorial-link">御剑入门教学</NuxtLink>
       <p class="version">v0.1.0 · 御剑入门版</p>
     </main>
@@ -146,6 +147,49 @@ const handleStart = () => {
 @keyframes pulse {
   0%, 100% { opacity: 0.5; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.05); }
+}
+
+/* 水墨书法动画 */
+.ink-brush-animate {
+  opacity: 0;
+  animation: inkBrush 1.5s ease-out forwards;
+}
+
+.ink-brush-animate.delay-1 {
+  animation-delay: 0.5s;
+}
+
+.ink-brush-animate.delay-2 {
+  animation-delay: 1s;
+}
+
+.ink-brush-animate.delay-3 {
+  animation-delay: 1.5s;
+}
+
+@keyframes inkBrush {
+  0% {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(20px) scale(0.9);
+    clip-path: inset(0 100% 0 0);
+  }
+  30% {
+    opacity: 0.5;
+    filter: blur(4px);
+    clip-path: inset(0 70% 0 0);
+  }
+  60% {
+    opacity: 0.8;
+    filter: blur(2px);
+    clip-path: inset(0 30% 0 0);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+    clip-path: inset(0 0 0 0);
+  }
 }
 
 .tutorial-link {
