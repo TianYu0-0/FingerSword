@@ -14,11 +14,18 @@ const {
   trail, 
   effects,
   attackState,
+  comboState,
+  gatherState,
   updatePosition, 
   update,
+  updateGather,
   onMouseDown,
   onMouseUp,
-  onDoubleClick
+  onDoubleClick,
+  onRightMouseDown,
+  onRightMouseUp,
+  wave,
+  spin
 } = useSword()
 
 const {
@@ -69,6 +76,24 @@ const handleMouseMove = (event: MouseEvent) => {
   if (!containerRef.value) return
   const rect = containerRef.value.getBoundingClientRect()
   updatePosition(event.clientX - rect.left, event.clientY - rect.top)
+}
+
+// 鼠标按下处理（区分左右键）
+const handleMouseDown = (event: MouseEvent) => {
+  if (event.button === 0) {
+    onMouseDown(event)
+  } else if (event.button === 2) {
+    onRightMouseDown()
+  }
+}
+
+// 鼠标松开处理（区分左右键）
+const handleMouseUp = (event: MouseEvent) => {
+  if (event.button === 0) {
+    onMouseUp(event)
+  } else if (event.button === 2) {
+    onRightMouseUp()
+  }
 }
 
 // 绘制水墨背景
@@ -301,6 +326,7 @@ const render = (timestamp: number) => {
   
   // 更新游戏状态
   update(deltaTime)
+  updateGather()
   updateParticles(deltaTime)
   
   // 清除并绘制
@@ -310,9 +336,56 @@ const render = (timestamp: number) => {
   drawParticles(ctx)
   drawEffects(ctx)
   drawChargeIndicator(ctx)
+  drawGatherSwords(ctx)
   drawSword(ctx)
+  drawComboIndicator(ctx)
   
   animationFrameId = requestAnimationFrame(render)
+}
+
+// 绘制聚集的剑
+const drawGatherSwords = (ctx: CanvasRenderingContext2D) => {
+  if (!gatherState.value.isGathering) return
+  
+  gatherState.value.swords.forEach(s => {
+    ctx.save()
+    ctx.translate(s.x, s.y)
+    ctx.rotate(s.angle)
+    ctx.globalAlpha = 0.7
+    
+    // 简化的剑形状
+    const gradient = ctx.createLinearGradient(-3, -30, 3, 30)
+    gradient.addColorStop(0, CONFIG.inkColor)
+    gradient.addColorStop(1, CONFIG.inkLightColor)
+    
+    ctx.fillStyle = gradient
+    ctx.beginPath()
+    ctx.moveTo(0, -30)
+    ctx.lineTo(3, 0)
+    ctx.lineTo(0, 5)
+    ctx.lineTo(-3, 0)
+    ctx.closePath()
+    ctx.fill()
+    
+    ctx.restore()
+  })
+}
+
+// 绘制连击指示器
+const drawComboIndicator = (ctx: CanvasRenderingContext2D) => {
+  if (comboState.value.count < 2) return
+  
+  const now = Date.now()
+  const timeSinceLastAttack = now - comboState.value.lastAttackTime
+  if (timeSinceLastAttack > 800) return
+  
+  ctx.save()
+  ctx.font = 'bold 24px "ZCOOL XiaoWei", serif'
+  ctx.textAlign = 'center'
+  ctx.fillStyle = CONFIG.vermilion
+  ctx.globalAlpha = 1 - timeSinceLastAttack / 800
+  ctx.fillText(`${comboState.value.count} 连击!`, canvasWidth.value / 2, 50)
+  ctx.restore()
 }
 
 onMounted(() => {
@@ -360,8 +433,8 @@ onUnmounted(() => {
     ref="containerRef" 
     class="game-canvas-container"
     @mousemove="handleMouseMove"
-    @mousedown="onMouseDown"
-    @mouseup="onMouseUp"
+    @mousedown="handleMouseDown"
+    @mouseup="handleMouseUp"
     @dblclick="onDoubleClick"
     @contextmenu.prevent
   >

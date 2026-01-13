@@ -12,13 +12,14 @@ export type AttackState = {
 
 export type SwordEffect = {
   id: string
-  type: 'slashWave' | 'chargeBlast' | 'thrust' | 'impact'
+  type: 'slashWave' | 'chargeBlast' | 'thrust' | 'impact' | 'wave' | 'swordRain' | 'spin' | 'comboHit'
   position: Vector2D
   direction: Vector2D
   size: number
   opacity: number
   age: number
   maxAge: number
+  extra?: any // 额外数据
 }
 
 export function useSword() {
@@ -46,6 +47,20 @@ export function useSword() {
   const isMouseDown = ref(false)
   const mouseDownTime = ref(0)
   
+  // 连击系统
+  const comboState = ref({
+    count: 0,
+    lastAttackTime: 0,
+    comboWindow: 800 // 连击窗口时间（毫秒）
+  })
+
+  // 右键聚剑状态
+  const gatherState = ref({
+    isGathering: false,
+    swords: [] as Array<{ x: number; y: number; angle: number; id: string }>,
+    startTime: 0
+  })
+
   // 配置参数
   const config = {
     followSpeed: 0.15,
@@ -54,7 +69,10 @@ export function useSword() {
     chargeTime: 1500, // 蓄力满需要的时间（毫秒）
     slashDuration: 200,
     chargeDuration: 400,
-    thrustDuration: 150
+    thrustDuration: 150,
+    waveDuration: 500,
+    swordRainDuration: 800,
+    spinDuration: 600
   }
 
   // 更新剑的位置
@@ -264,18 +282,196 @@ export function useSword() {
     thrust(e.offsetX, e.offsetY)
   }
 
+  // 剑气波（环形攻击）
+  const wave = () => {
+    if (attackState.value.isAttacking) return
+
+    attackState.value = {
+      isAttacking: true,
+      type: 'wave',
+      chargeLevel: 0,
+      startTime: Date.now(),
+      direction: { x: 0, y: -1 }
+    }
+
+    // 添加环形剑气特效
+    effects.value.push({
+      id: generateId(),
+      type: 'wave',
+      position: { ...sword.value.position },
+      direction: { x: 0, y: 0 },
+      size: 20,
+      opacity: 1,
+      age: 0,
+      maxAge: config.waveDuration
+    })
+
+    // 更新连击
+    updateCombo()
+  }
+
+  // 回旋斩（360度旋转攻击）
+  const spin = () => {
+    if (attackState.value.isAttacking) return
+
+    attackState.value = {
+      isAttacking: true,
+      type: 'slash',
+      chargeLevel: 0,
+      startTime: Date.now(),
+      direction: { x: 0, y: -1 }
+    }
+
+    // 添加回旋特效
+    effects.value.push({
+      id: generateId(),
+      type: 'spin',
+      position: { ...sword.value.position },
+      direction: { x: 0, y: 0 },
+      size: 60,
+      opacity: 1,
+      age: 0,
+      maxAge: config.spinDuration
+    })
+
+    updateCombo()
+  }
+
+  // 万剑归宗（右键长按释放）
+  const swordRain = () => {
+    if (!gatherState.value.isGathering) return
+    if (gatherState.value.swords.length === 0) return
+
+    attackState.value = {
+      isAttacking: true,
+      type: 'swordRain',
+      chargeLevel: 1,
+      startTime: Date.now(),
+      direction: { x: 0, y: -1 }
+    }
+
+    // 为每把聚集的剑添加特效
+    gatherState.value.swords.forEach((s, i) => {
+      setTimeout(() => {
+        effects.value.push({
+          id: generateId(),
+          type: 'swordRain',
+          position: { x: s.x, y: s.y },
+          direction: { 
+            x: Math.cos(s.angle), 
+            y: Math.sin(s.angle) 
+          },
+          size: 40,
+          opacity: 1,
+          age: 0,
+          maxAge: 400,
+          extra: { startX: s.x, startY: s.y }
+        })
+      }, i * 50) // 依次发射
+    })
+
+    // 重置聚剑状态
+    gatherState.value.isGathering = false
+    gatherState.value.swords = []
+  }
+
+  // 开始聚剑（右键按下）
+  const startGather = () => {
+    gatherState.value.isGathering = true
+    gatherState.value.startTime = Date.now()
+    gatherState.value.swords = []
+  }
+
+  // 更新聚剑（在 update 中调用）
+  const updateGather = () => {
+    if (!gatherState.value.isGathering) return
+
+    const elapsed = Date.now() - gatherState.value.startTime
+    const maxSwords = 8
+
+    // 每 200ms 添加一把剑
+    const shouldHaveSwords = Math.min(maxSwords, Math.floor(elapsed / 200))
+    
+    while (gatherState.value.swords.length < shouldHaveSwords) {
+      const angle = (gatherState.value.swords.length / maxSwords) * Math.PI * 2
+      const radius = 80
+      gatherState.value.swords.push({
+        id: generateId(),
+        x: sword.value.position.x + Math.cos(angle) * radius,
+        y: sword.value.position.y + Math.sin(angle) * radius,
+        angle: angle + Math.PI / 2
+      })
+    }
+
+    // 更新剑的位置跟随主剑
+    gatherState.value.swords.forEach((s, i) => {
+      const angle = (i / maxSwords) * Math.PI * 2 + Date.now() * 0.002
+      const radius = 80
+      s.x = sword.value.position.x + Math.cos(angle) * radius
+      s.y = sword.value.position.y + Math.sin(angle) * radius
+      s.angle = angle + Math.PI / 2
+    })
+  }
+
+  // 更新连击计数
+  const updateCombo = () => {
+    const now = Date.now()
+    if (now - comboState.value.lastAttackTime < comboState.value.comboWindow) {
+      comboState.value.count++
+      
+      // 连击特效
+      if (comboState.value.count >= 3) {
+        effects.value.push({
+          id: generateId(),
+          type: 'comboHit',
+          position: { ...sword.value.position },
+          direction: { x: 0, y: -1 },
+          size: 30 + comboState.value.count * 10,
+          opacity: 1,
+          age: 0,
+          maxAge: 300,
+          extra: { combo: comboState.value.count }
+        })
+      }
+    } else {
+      comboState.value.count = 1
+    }
+    comboState.value.lastAttackTime = now
+  }
+
+  // 右键按下
+  const onRightMouseDown = () => {
+    startGather()
+  }
+
+  // 右键松开
+  const onRightMouseUp = () => {
+    if (gatherState.value.isGathering) {
+      swordRain()
+    }
+  }
+
   return {
     sword: readonly(sword),
     trail: readonly(trail),
     effects: readonly(effects),
     attackState: readonly(attackState),
+    comboState: readonly(comboState),
+    gatherState: readonly(gatherState),
     updatePosition,
     update,
+    updateGather,
     slash,
     chargeSlash,
     thrust,
+    wave,
+    spin,
+    swordRain,
+    startGather,
     onMouseDown,
     onMouseUp,
-    onDoubleClick
+    onDoubleClick,
+    onRightMouseDown,
+    onRightMouseUp
   }
 }
