@@ -1,6 +1,6 @@
 import type { Vector2D, Sword, InkTrail } from '~/types/game'
 
-export type AttackType = 'slash' | 'charge' | 'thrust' | 'wave' | 'swordRain'
+export type AttackType = 'slash' | 'charge' | 'thrust' | 'wave' | 'swordRain' | 'shield' | 'sweep'
 
 export type AttackState = {
   isAttacking: boolean
@@ -59,6 +59,20 @@ export function useSword() {
     isGathering: false,
     swords: [] as Array<{ x: number; y: number; angle: number; id: string }>,
     startTime: 0
+  })
+
+  // 护盾状态
+  const shieldState = ref({
+    isActive: false,
+    startTime: 0,
+    duration: 2000 // 护盾持续时间
+  })
+
+  // 剑阵旋转状态
+  const formationState = ref({
+    rotation: 0,
+    rotationSpeed: 0,
+    isExpanded: false
   })
 
   // 配置参数
@@ -451,6 +465,108 @@ export function useSword() {
     }
   }
 
+  // 剑气护盾（左右键同按）
+  const shield = () => {
+    if (shieldState.value.isActive) return
+
+    shieldState.value.isActive = true
+    shieldState.value.startTime = Date.now()
+
+    attackState.value = {
+      isAttacking: true,
+      type: 'shield',
+      chargeLevel: 0,
+      startTime: Date.now(),
+      direction: { x: 0, y: 0 }
+    }
+
+    // 添加护盾特效
+    effects.value.push({
+      id: generateId(),
+      type: 'wave',
+      position: { ...sword.value.position },
+      direction: { x: 0, y: 0 },
+      size: 60,
+      opacity: 0.8,
+      age: 0,
+      maxAge: shieldState.value.duration,
+      extra: { isShield: true }
+    })
+  }
+
+  // 更新护盾状态
+  const updateShield = () => {
+    if (!shieldState.value.isActive) return
+
+    const elapsed = Date.now() - shieldState.value.startTime
+    if (elapsed >= shieldState.value.duration) {
+      shieldState.value.isActive = false
+      attackState.value.isAttacking = false
+      attackState.value.type = null
+    }
+  }
+
+  // 剑气横扫（快速移动鼠标）
+  const sweep = () => {
+    if (attackState.value.isAttacking) return
+
+    attackState.value = {
+      isAttacking: true,
+      type: 'sweep',
+      chargeLevel: 0,
+      startTime: Date.now(),
+      direction: {
+        x: sword.value.velocity.x,
+        y: sword.value.velocity.y
+      }
+    }
+
+    // 添加横扫特效
+    const angle = Math.atan2(sword.value.velocity.y, sword.value.velocity.x)
+    for (let i = -2; i <= 2; i++) {
+      effects.value.push({
+        id: generateId(),
+        type: 'slashWave',
+        position: { ...sword.value.position },
+        direction: {
+          x: Math.cos(angle + i * 0.3),
+          y: Math.sin(angle + i * 0.3)
+        },
+        size: 40,
+        opacity: 0.8 - Math.abs(i) * 0.15,
+        age: Math.abs(i) * 30,
+        maxAge: 400
+      })
+    }
+
+    updateCombo()
+  }
+
+  // 剑阵顺时针旋转
+  const rotateClockwise = () => {
+    formationState.value.rotationSpeed = 0.05
+  }
+
+  // 剑阵逆时针旋转
+  const rotateCounterClockwise = () => {
+    formationState.value.rotationSpeed = -0.05
+  }
+
+  // 停止旋转
+  const stopRotation = () => {
+    formationState.value.rotationSpeed = 0
+  }
+
+  // 剑阵散开/收拢切换
+  const toggleFormation = () => {
+    formationState.value.isExpanded = !formationState.value.isExpanded
+  }
+
+  // 更新剑阵旋转
+  const updateFormation = () => {
+    formationState.value.rotation += formationState.value.rotationSpeed
+  }
+
   return {
     sword: readonly(sword),
     trail: readonly(trail),
@@ -458,9 +574,13 @@ export function useSword() {
     attackState: readonly(attackState),
     comboState: readonly(comboState),
     gatherState: readonly(gatherState),
+    shieldState: readonly(shieldState),
+    formationState: readonly(formationState),
     updatePosition,
     update,
     updateGather,
+    updateShield,
+    updateFormation,
     slash,
     chargeSlash,
     thrust,
@@ -468,6 +588,12 @@ export function useSword() {
     spin,
     swordRain,
     startGather,
+    shield,
+    sweep,
+    rotateClockwise,
+    rotateCounterClockwise,
+    stopRotation,
+    toggleFormation,
     onMouseDown,
     onMouseUp,
     onDoubleClick,

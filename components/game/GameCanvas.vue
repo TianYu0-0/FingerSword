@@ -21,16 +21,26 @@ const {
   attackState,
   comboState,
   gatherState,
+  shieldState,
+  formationState,
   updatePosition, 
   update,
   updateGather,
+  updateShield,
+  updateFormation,
   onMouseDown,
   onMouseUp,
   onDoubleClick,
   onRightMouseDown,
   onRightMouseUp,
   wave,
-  spin
+  spin,
+  shield,
+  sweep,
+  rotateClockwise,
+  rotateCounterClockwise,
+  stopRotation,
+  toggleFormation
 } = useSword()
 
 const {
@@ -98,6 +108,26 @@ const handleMouseUp = (event: MouseEvent) => {
     onMouseUp(event)
   } else if (event.button === 2) {
     onRightMouseUp()
+  }
+}
+
+// 滚轮事件处理
+const handleWheel = (event: WheelEvent) => {
+  event.preventDefault()
+  if (event.deltaY < 0) {
+    rotateClockwise()
+  } else {
+    rotateCounterClockwise()
+  }
+  // 短暂后停止旋转
+  setTimeout(() => stopRotation(), 100)
+}
+
+// 滚轮点击处理
+const handleMiddleClick = (event: MouseEvent) => {
+  if (event.button === 1) {
+    event.preventDefault()
+    toggleFormation()
   }
 }
 
@@ -332,6 +362,8 @@ const render = (timestamp: number) => {
   // 更新游戏状态
   update(deltaTime)
   updateGather()
+  updateShield()
+  updateFormation()
   updateParticles(deltaTime)
   
   // 清除并绘制
@@ -342,10 +374,52 @@ const render = (timestamp: number) => {
   drawEffects(ctx)
   drawChargeIndicator(ctx)
   drawGatherSwords(ctx)
+  drawShield(ctx)
   drawSword(ctx)
   drawComboIndicator(ctx)
   
   animationFrameId = requestAnimationFrame(render)
+}
+
+// 绘制护盾
+const drawShield = (ctx: CanvasRenderingContext2D) => {
+  if (!shieldState.value.isActive) return
+  
+  const elapsed = Date.now() - shieldState.value.startTime
+  const progress = elapsed / shieldState.value.duration
+  const alpha = 0.6 * (1 - progress)
+  
+  ctx.save()
+  ctx.globalAlpha = alpha
+  
+  // 护盾外圈
+  ctx.strokeStyle = CONFIG.vermilion
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.arc(sword.value.position.x, sword.value.position.y, 70, 0, Math.PI * 2)
+  ctx.stroke()
+  
+  // 护盾内圈
+  ctx.strokeStyle = CONFIG.inkColor
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.arc(sword.value.position.x, sword.value.position.y, 50, 0, Math.PI * 2)
+  ctx.stroke()
+  
+  // 护盾填充
+  const gradient = ctx.createRadialGradient(
+    sword.value.position.x, sword.value.position.y, 0,
+    sword.value.position.x, sword.value.position.y, 70
+  )
+  gradient.addColorStop(0, 'transparent')
+  gradient.addColorStop(0.7, `rgba(196, 30, 58, ${alpha * 0.2})`)
+  gradient.addColorStop(1, 'transparent')
+  ctx.fillStyle = gradient
+  ctx.beginPath()
+  ctx.arc(sword.value.position.x, sword.value.position.y, 70, 0, Math.PI * 2)
+  ctx.fill()
+  
+  ctx.restore()
 }
 
 // 绘制聚集的剑
@@ -441,6 +515,8 @@ onUnmounted(() => {
     @mousedown="handleMouseDown"
     @mouseup="handleMouseUp"
     @dblclick="onDoubleClick"
+    @wheel.prevent="handleWheel"
+    @auxclick="handleMiddleClick"
     @contextmenu.prevent
   >
     <canvas ref="canvasRef" :width="canvasWidth" :height="canvasHeight" />
