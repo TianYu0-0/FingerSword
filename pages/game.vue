@@ -2,6 +2,10 @@
 import GameCanvas from '~/components/game/GameCanvas.vue'
 import { useGesture } from '~/composables/useGesture'
 import { useGestureActions } from '~/composables/useGestureActions'
+import { useTutorial } from '~/composables/useTutorial'
+
+const route = useRoute()
+const isTutorialMode = computed(() => route.query.level === 'tutorial')
 
 const showHelp = ref(false)
 const showModeSelector = ref(false)
@@ -27,6 +31,31 @@ const {
   processGesture,
   reset: resetGestureActions
 } = useGestureActions()
+
+// 教程系统
+const {
+  state: tutorialState,
+  currentStepData,
+  progress: tutorialProgress,
+  isComplete: isTutorialComplete,
+  targetPosition,
+  showTarget,
+  startTutorial,
+  skipTutorial,
+  handleAction: handleTutorialAction,
+  generateTarget
+} = useTutorial()
+
+// 教程模式初始化
+onMounted(() => {
+  if (isTutorialMode.value) {
+    startTutorial()
+    // 生成第一个目标
+    nextTick(() => {
+      generateTarget(window.innerWidth, window.innerHeight)
+    })
+  }
+})
 
 // 控制模式图标
 const modeIcons = {
@@ -114,7 +143,48 @@ watch(gestureState, (newState) => {
 
 <template>
   <div class="game-container">
-    <GameCanvas ref="gameCanvasRef" class="canvas-layer" :gesture-mode="controlMode === 'gesture'" />
+    <GameCanvas 
+      ref="gameCanvasRef" 
+      class="canvas-layer" 
+      :gesture-mode="controlMode === 'gesture'"
+      :tutorial-mode="isTutorialMode"
+      :target-position="targetPosition"
+      :show-target="showTarget"
+      @sword-move="(pos: { x: number; y: number }) => handleTutorialAction('move', pos)"
+      @sword-slash="() => handleTutorialAction('slash')"
+      @sword-charge="(data: { chargeLevel: number }) => handleTutorialAction('charge', data)"
+      @sword-thrust="() => handleTutorialAction('thrust')"
+    />
+    
+    <!-- 教程引导面板 -->
+    <div v-if="isTutorialMode && tutorialState.isActive && !isTutorialComplete" class="tutorial-overlay">
+      <div class="tutorial-panel ink-card">
+        <div class="tutorial-progress">
+          <div class="progress-bar" :style="{ width: `${tutorialProgress * 100}%` }"></div>
+        </div>
+        <div class="tutorial-step">
+          <h3 class="step-title">{{ currentStepData?.title }}</h3>
+          <p class="step-description">{{ currentStepData?.description }}</p>
+          <p class="step-instruction">💡 {{ currentStepData?.instruction }}</p>
+        </div>
+        <button class="skip-btn" @click="skipTutorial">跳过教学</button>
+      </div>
+    </div>
+    
+    <!-- 教程完成面板 -->
+    <div v-if="isTutorialMode && isTutorialComplete" class="tutorial-complete-overlay">
+      <div class="complete-panel ink-card">
+        <h2>🎉 恭喜少侠，御剑入门！</h2>
+        <p>你已掌握以下技能：</p>
+        <ul class="skill-list">
+          <li>✅ 御剑初成 - 控制剑移动</li>
+          <li>✅ 剑气凌厉 - 释放剑气斩击</li>
+          <li>✅ 气贯长虹 - 蓄力强力斩</li>
+          <li>✅ 瞬影突刺 - 瞬移突刺</li>
+        </ul>
+        <NuxtLink to="/levels" class="continue-btn ink-card">进入江湖</NuxtLink>
+      </div>
+    </div>
     
     <header class="game-header">
       <NuxtLink to="/" class="back-btn ink-card">← 返回</NuxtLink>
@@ -505,5 +575,123 @@ watch(gestureState, (newState) => {
 
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
+}
+
+/* 教程引导样式 */
+.tutorial-overlay {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  pointer-events: none;
+}
+
+.tutorial-panel {
+  padding: 20px 30px;
+  text-align: center;
+  pointer-events: auto;
+  min-width: 300px;
+}
+
+.tutorial-progress {
+  height: 4px;
+  background: rgba(107, 107, 107, 0.2);
+  border-radius: 2px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #d4a574, #C41E3A);
+  transition: width 0.3s ease;
+}
+
+.step-title {
+  font-family: 'ZCOOL XiaoWei', serif;
+  font-size: 24px;
+  color: #d4a574;
+  margin: 0 0 8px 0;
+}
+
+.step-description {
+  font-size: 14px;
+  color: #999;
+  margin: 0 0 12px 0;
+}
+
+.step-instruction {
+  font-size: 16px;
+  color: #f5f5f5;
+  margin: 0;
+  padding: 12px;
+  background: rgba(212, 165, 116, 0.1);
+  border-radius: 8px;
+}
+
+.skip-btn {
+  margin-top: 16px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid rgba(107, 107, 107, 0.3);
+  color: #6B6B6B;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.skip-btn:hover {
+  border-color: rgba(196, 30, 58, 0.5);
+  color: #C41E3A;
+}
+
+/* 教程完成面板 */
+.tutorial-complete-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 200;
+}
+
+.complete-panel {
+  padding: 40px 60px;
+  text-align: center;
+}
+
+.complete-panel h2 {
+  font-family: 'ZCOOL XiaoWei', serif;
+  font-size: 32px;
+  color: #d4a574;
+  margin: 0 0 16px 0;
+}
+
+.complete-panel p {
+  color: #999;
+  margin: 0 0 16px 0;
+}
+
+.skill-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px 0;
+  text-align: left;
+}
+
+.skill-list li {
+  padding: 8px 0;
+  color: #f5f5f5;
+  font-size: 14px;
+}
+
+.continue-btn {
+  display: inline-block;
+  padding: 12px 32px;
+  font-size: 16px;
+  text-decoration: none;
+  color: #d4a574;
 }
 </style>
