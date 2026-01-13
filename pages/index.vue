@@ -37,7 +37,10 @@ const handleStart = () => {
       </div>
       
       <button class="btn-seal ink-brush-animate delay-3" @click="handleStart">开始修炼</button>
-      <NuxtLink to="/tutorial" class="tutorial-link">御剑入门教学</NuxtLink>
+      <div class="nav-links">
+        <NuxtLink to="/levels" class="nav-link">🏔️ 关卡选择</NuxtLink>
+        <NuxtLink to="/tutorial" class="nav-link">📖 御剑入门</NuxtLink>
+      </div>
       <p class="version">v0.1.0 · 御剑入门版</p>
     </main>
   </div>
@@ -192,17 +195,26 @@ const handleStart = () => {
   }
 }
 
-.tutorial-link {
-  display: block;
-  margin-top: 1rem;
-  color: #6B6B6B;
-  font-size: 0.875rem;
-  text-decoration: none;
-  transition: color 0.2s;
+.nav-links {
+  display: flex;
+  gap: 24px;
+  margin-top: 1.5rem;
 }
 
-.tutorial-link:hover {
-  color: #C41E3A;
+.nav-link {
+  color: #8B8B8B;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: all 0.2s;
+  padding: 8px 16px;
+  border: 1px solid rgba(139, 139, 139, 0.3);
+  border-radius: 4px;
+}
+
+.nav-link:hover {
+  color: #d4a574;
+  border-color: rgba(212, 165, 116, 0.5);
+  background: rgba(212, 165, 116, 0.1);
 }
 
 .version {
