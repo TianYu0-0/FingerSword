@@ -5,6 +5,11 @@ import { useSound } from '~/composables/useSound'
 import { useTouch } from '~/composables/useTouch'
 import type { Sword, InkTrail } from '~/types/game'
 
+// Props
+const props = defineProps<{
+  gestureMode?: boolean
+}>()
+
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const containerRef = ref<HTMLDivElement | null>(null)
 

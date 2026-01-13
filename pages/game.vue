@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import GameCanvas from '~/components/game/GameCanvas.vue'
 import { useGesture } from '~/composables/useGesture'
+import { useGestureActions } from '~/composables/useGestureActions'
 
 const showHelp = ref(false)
 const controlMode = ref<'mouse' | 'gesture'>('mouse')
 const showGesturePanel = ref(false)
 const videoRef = ref<HTMLVideoElement | null>(null)
+const gameCanvasRef = ref<InstanceType<typeof GameCanvas> | null>(null)
 
 const { 
   isInitialized, 
@@ -15,6 +17,13 @@ const {
   initialize,
   stop 
 } = useGesture()
+
+const {
+  state: gestureActionState,
+  setCallbacks,
+  processGesture,
+  reset: resetGestureActions
+} = useGestureActions()
 
 // 切换手势控制
 const toggleGestureControl = async () => {
@@ -39,13 +48,24 @@ const closeGesturePanel = () => {
   if (controlMode.value === 'gesture') {
     controlMode.value = 'mouse'
     stop()
+    resetGestureActions()
   }
 }
+
+// 手势状态变化时处理动作
+watch(gestureState, (newState) => {
+  if (controlMode.value === 'gesture' && isInitialized.value) {
+    // 使用画布尺寸进行坐标映射
+    const canvasWidth = window.innerWidth
+    const canvasHeight = window.innerHeight
+    processGesture(newState, canvasWidth, canvasHeight)
+  }
+}, { deep: true })
 </script>
 
 <template>
   <div class="game-container">
-    <GameCanvas class="canvas-layer" />
+    <GameCanvas ref="gameCanvasRef" class="canvas-layer" :gesture-mode="controlMode === 'gesture'" />
     
     <header class="game-header">
       <NuxtLink to="/" class="back-btn ink-card">← 返回</NuxtLink>
