@@ -90,7 +90,7 @@ const loadImages = () => {
   
   // 加载剑图片
   const sw = new Image()
-  sw.src = '/images/sword.jpg'
+  sw.src = '/images/sword.png'
   sw.onload = () => {
     swordImage.value = sw
   }
@@ -173,16 +173,6 @@ const drawBackground = (ctx: CanvasRenderingContext2D) => {
     ctx.globalAlpha = 1
   }
   
-  ctx.globalAlpha = 0.03
-  for (let i = 0; i < 50; i++) {
-    const x = Math.random() * canvasWidth.value
-    const y = Math.random() * canvasHeight.value
-    const size = Math.random() * 100 + 20
-    ctx.fillStyle = CONFIG.inkLightColor
-    ctx.beginPath()
-    ctx.arc(x, y, size, 0, Math.PI * 2)
-    ctx.fill()
-  }
   ctx.globalAlpha = 1
 }
 
