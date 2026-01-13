@@ -1,3 +1,16 @@
+/* CSS 重置 */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 /* 水墨风格基础样式 */
 html {
   background-color: #F5F0E6;
@@ -7,7 +20,6 @@ html {
 body {
   font-family: 'ZCOOL XiaoWei', serif;
   background: linear-gradient(180deg, rgba(245, 240, 230, 0.95) 0%, rgba(245, 240, 230, 0.85) 100%);
-  min-height: 100vh;
 }
 
 /* 按钮 - 印章风格 */
