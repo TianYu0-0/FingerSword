@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { useSword, type SwordEffect } from '~/composables/useSword'
+import { useParticles } from '~/composables/useParticles'
+import { useSound } from '~/composables/useSound'
 import type { Sword, InkTrail } from '~/types/game'
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const containerRef = ref<HTMLDivElement | null>(null)
 
-// 使用 useSword composable
+// 使用 composables
 const { 
   sword, 
   trail, 
@@ -17,6 +19,16 @@ const {
   onMouseUp,
   onDoubleClick
 } = useSword()
+
+const {
+  emitInkSplash,
+  emitSparks,
+  emitDust,
+  update: updateParticles,
+  draw: drawParticles
+} = useParticles()
+
+const { play: playSound } = useSound()
 
 // Canvas 尺寸
 const canvasWidth = ref(800)
@@ -251,6 +263,26 @@ const drawSword = (ctx: CanvasRenderingContext2D) => {
   ctx.restore()
 }
 
+// 监听攻击状态变化
+watch(() => attackState.value.type, (newType, oldType) => {
+  if (newType && !oldType) {
+    const pos = sword.value.position
+    const dir = attackState.value.direction
+    
+    if (newType === 'slash') {
+      emitInkSplash(pos.x, pos.y, 8, dir)
+      playSound('slash')
+    } else if (newType === 'charge') {
+      emitSparks(pos.x, pos.y, 20)
+      emitInkSplash(pos.x, pos.y, 15, dir)
+      playSound('release')
+    } else if (newType === 'thrust') {
+      emitDust(pos.x, pos.y, 8)
+      playSound('thrust')
+    }
+  }
+})
+
 // 主渲染循环
 const render = (timestamp: number) => {
   const canvas = canvasRef.value
@@ -264,11 +296,13 @@ const render = (timestamp: number) => {
   
   // 更新游戏状态
   update(deltaTime)
+  updateParticles(deltaTime)
   
   // 清除并绘制
   ctx.clearRect(0, 0, canvasWidth.value, canvasHeight.value)
   drawBackground(ctx)
   drawTrail(ctx)
+  drawParticles(ctx)
   drawEffects(ctx)
   drawChargeIndicator(ctx)
   drawSword(ctx)
