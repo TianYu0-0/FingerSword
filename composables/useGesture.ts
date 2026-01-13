@@ -1,5 +1,3 @@
-import type { Ref } from 'vue'
-
 export type GestureType = 
   | 'pointing'      // 食指指向
   | 'fist'          // 握拳
@@ -53,8 +51,6 @@ export function useGesture() {
     const ringPIP = landmarks[14]
     const pinkyPIP = landmarks[18]
     
-    const wrist = landmarks[0]
-
     // 判断手指是否伸直
     const isFingerExtended = (tip: any, pip: any) => tip.y < pip.y
     
