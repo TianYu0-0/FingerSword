@@ -1,7 +1,46 @@
 <script setup lang="ts">
 import GameCanvas from '~/components/game/GameCanvas.vue'
+import { useGesture } from '~/composables/useGesture'
 
 const showHelp = ref(false)
+const controlMode = ref<'mouse' | 'gesture'>('mouse')
+const showGesturePanel = ref(false)
+const videoRef = ref<HTMLVideoElement | null>(null)
+
+const { 
+  isInitialized, 
+  isLoading, 
+  error, 
+  gestureState,
+  initialize,
+  stop 
+} = useGesture()
+
+// 切换手势控制
+const toggleGestureControl = async () => {
+  if (controlMode.value === 'gesture') {
+    controlMode.value = 'mouse'
+    showGesturePanel.value = false
+    stop()
+  } else {
+    showGesturePanel.value = true
+    if (videoRef.value) {
+      const success = await initialize(videoRef.value)
+      if (success) {
+        controlMode.value = 'gesture'
+      }
+    }
+  }
+}
+
+// 关闭手势面板
+const closeGesturePanel = () => {
+  showGesturePanel.value = false
+  if (controlMode.value === 'gesture') {
+    controlMode.value = 'mouse'
+    stop()
+  }
+}
 </script>
 
 <template>
@@ -10,8 +49,36 @@ const showHelp = ref(false)
     
     <header class="game-header">
       <NuxtLink to="/" class="back-btn ink-card">← 返回</NuxtLink>
-      <button class="help-btn ink-card" @click="showHelp = !showHelp">?</button>
+      <div class="header-right">
+        <button 
+          class="gesture-btn ink-card" 
+          :class="{ active: controlMode === 'gesture' }"
+          @click="toggleGestureControl"
+        >
+          {{ controlMode === 'gesture' ? '✋' : '🖱️' }}
+        </button>
+        <button class="help-btn ink-card" @click="showHelp = !showHelp">?</button>
+      </div>
     </header>
+    
+    <!-- 手势控制面板 -->
+    <Transition name="fade">
+      <div v-if="showGesturePanel" class="gesture-panel ink-card">
+        <h3 class="panel-title">手势控制</h3>
+        <video ref="videoRef" class="gesture-video" autoplay playsinline muted />
+        <div v-if="isLoading" class="gesture-status">正在初始化摄像头...</div>
+        <div v-else-if="error" class="gesture-status error">{{ error }}</div>
+        <div v-else-if="isInitialized" class="gesture-status success">
+          手势: {{ gestureState.type }}
+        </div>
+        <div class="gesture-tips">
+          <p>👆 食指指向 - 控制剑位置</p>
+          <p>✊ 握拳 - 蓄力</p>
+          <p>🖐️ 张开手掌 - 释放</p>
+        </div>
+        <button class="close-btn" @click="closeGesturePanel">关闭</button>
+      </div>
+    </Transition>
     
     <Transition name="fade">
       <div v-if="showHelp" class="help-panel ink-card">
@@ -125,6 +192,78 @@ const showHelp = ref(false)
 
 .close-btn:hover {
   color: #1A1A1A;
+}
+
+.header-right {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.gesture-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.gesture-btn.active {
+  background-color: rgba(196, 30, 58, 0.1);
+  border-color: #C41E3A;
+}
+
+.gesture-panel {
+  position: absolute;
+  top: 5rem;
+  left: 1rem;
+  z-index: 20;
+  padding: 1rem;
+  width: 280px;
+}
+
+.panel-title {
+  font-family: 'ZCOOL XiaoWei', serif;
+  font-size: 1.125rem;
+  color: #1A1A1A;
+  margin-bottom: 0.75rem;
+}
+
+.gesture-video {
+  width: 100%;
+  height: 180px;
+  background: #000;
+  border-radius: 4px;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.gesture-status {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #6B6B6B;
+  text-align: center;
+}
+
+.gesture-status.error {
+  color: #C41E3A;
+}
+
+.gesture-status.success {
+  color: #2E7D32;
+}
+
+.gesture-tips {
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: #6B6B6B;
+}
+
+.gesture-tips p {
+  margin: 0.25rem 0;
 }
 
 .fade-enter-active, .fade-leave-active {
