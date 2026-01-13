@@ -2,6 +2,7 @@
 import { useSword, type SwordEffect } from '~/composables/useSword'
 import { useParticles } from '~/composables/useParticles'
 import { useSound } from '~/composables/useSound'
+import { useTouch } from '~/composables/useTouch'
 import type { Sword, InkTrail } from '~/types/game'
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -29,6 +30,10 @@ const {
 } = useParticles()
 
 const { play: playSound } = useSound()
+const { bindToElement } = useTouch()
+
+// 触摸事件解绑函数
+let unbindTouch: (() => void) | null = null
 
 // Canvas 尺寸
 const canvasWidth = ref(800)
@@ -314,11 +319,39 @@ onMounted(() => {
   updateCanvasSize()
   window.addEventListener('resize', updateCanvasSize)
   animationFrameId = requestAnimationFrame(render)
+  
+  // 绑定触摸事件
+  if (containerRef.value) {
+    unbindTouch = bindToElement(containerRef.value, {
+      onStart: (data) => {
+        if (data) {
+          updatePosition(data.position.x, data.position.y)
+          if (data.isDoubleTap) {
+            // 双击触发突刺
+            onDoubleClick({ offsetX: data.position.x, offsetY: data.position.y } as MouseEvent)
+          } else {
+            onMouseDown({ button: 0 } as MouseEvent)
+          }
+        }
+      },
+      onMove: (data) => {
+        if (data) {
+          updatePosition(data.position.x, data.position.y)
+        }
+      },
+      onEnd: (data) => {
+        if (data) {
+          onMouseUp({ button: 0 } as MouseEvent)
+        }
+      }
+    })
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateCanvasSize)
   if (animationFrameId) cancelAnimationFrame(animationFrameId)
+  if (unbindTouch) unbindTouch()
 })
 </script>
 
