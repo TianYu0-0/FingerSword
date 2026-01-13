@@ -255,6 +255,48 @@ const drawEffects = (ctx: CanvasRenderingContext2D) => {
       ctx.closePath()
       ctx.fillStyle = CONFIG.inkLightColor
       ctx.fill()
+    } else if (effect.type === 'swordRain') {
+      // 万剑齐发特效 - 飞行的剑
+      const progress = effect.age / effect.maxAge
+      const speed = 800  // 飞行速度
+      const distance = progress * speed
+      
+      // 计算当前位置
+      const currentX = effect.direction.x * distance
+      const currentY = effect.direction.y * distance
+      
+      ctx.translate(currentX, currentY)
+      
+      // 使用图片绘制飞行的剑
+      const flyAngle = effect.extra?.angle || Math.atan2(effect.direction.y, effect.direction.x)
+      ctx.rotate(flyAngle + Math.PI / 2)
+      
+      if (swordImage.value) {
+        const imgSize = 40
+        ctx.drawImage(swordImage.value, -imgSize / 2, -imgSize / 2, imgSize, imgSize)
+      } else {
+        // 备用绘制
+        ctx.fillStyle = CONFIG.inkColor
+        ctx.beginPath()
+        ctx.moveTo(0, -20)
+        ctx.lineTo(3, 0)
+        ctx.lineTo(0, 6)
+        ctx.lineTo(-3, 0)
+        ctx.closePath()
+        ctx.fill()
+      }
+      
+      // 拖尾效果
+      ctx.rotate(-(flyAngle + Math.PI / 2))
+      ctx.globalAlpha = 0.3
+      for (let i = 1; i <= 3; i++) {
+        const tailX = -effect.direction.x * i * 15
+        const tailY = -effect.direction.y * i * 15
+        ctx.beginPath()
+        ctx.arc(tailX, tailY, 3 - i * 0.5, 0, Math.PI * 2)
+        ctx.fillStyle = CONFIG.inkLightColor
+        ctx.fill()
+      }
     }
     
     ctx.restore()
