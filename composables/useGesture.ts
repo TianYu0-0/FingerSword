@@ -131,15 +131,22 @@ export function useGesture() {
   }
 
   const initialize = async (video: HTMLVideoElement): Promise<boolean> => {
-    if (isInitialized.value) return true
+    console.log('[useGesture] initialize 开始')
+    if (isInitialized.value) {
+      console.log('[useGesture] 已初始化，跳过')
+      return true
+    }
     
     isLoading.value = true
     error.value = null
     videoElement = video
+    console.log('[useGesture] videoElement:', video)
 
     try {
       // 先检查权限
+      console.log('[useGesture] 检查摄像头权限...')
       const status = await checkPermission()
+      console.log('[useGesture] 权限状态:', status)
       if (status === 'denied') {
         error.value = '摄像头权限被拒绝，请在浏览器设置中允许访问摄像头'
         isLoading.value = false
@@ -147,8 +154,10 @@ export function useGesture() {
       }
 
       // 动态导入 MediaPipe
+      console.log('[useGesture] 导入 MediaPipe...')
       const { Hands } = await import('@mediapipe/hands')
       const { Camera } = await import('@mediapipe/camera_utils')
+      console.log('[useGesture] MediaPipe 导入成功')
 
       hands = new Hands({
         locateFile: (file: string) => {
@@ -205,14 +214,17 @@ export function useGesture() {
       })
 
       // 请求摄像头权限
+      console.log('[useGesture] 请求摄像头权限...')
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: 640, height: 480 }
       })
+      console.log('[useGesture] 摄像头流获取成功:', stream)
       
       permissionStatus.value = 'granted'
       video.srcObject = stream
       await video.play()
       hasCamera.value = true
+      console.log('[useGesture] 视频播放成功')
 
       camera = new Camera(video, {
         onFrame: async () => {
@@ -222,12 +234,15 @@ export function useGesture() {
         height: 480
       })
 
+      console.log('[useGesture] 启动摄像头...')
       await camera.start()
+      console.log('[useGesture] 摄像头启动成功')
       isInitialized.value = true
       isLoading.value = false
       return true
 
     } catch (e: any) {
+      console.error('[useGesture] 初始化失败:', e)
       // 处理不同的错误类型
       if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
         permissionStatus.value = 'denied'
