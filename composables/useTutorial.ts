@@ -130,10 +130,19 @@ export function useTutorial() {
 
   // 处理动作
   const handleAction = (action: string, payload?: any) => {
-    if (!state.value.isActive || isComplete.value) return
+    console.log('[useTutorial] handleAction:', action, 'payload:', payload, 'isActive:', state.value.isActive)
+    if (!state.value.isActive || isComplete.value) {
+      console.log('[useTutorial] 跳过：教程未激活或已完成')
+      return
+    }
 
     const step = currentStepData.value
-    if (!step) return
+    if (!step) {
+      console.log('[useTutorial] 跳过：没有当前步骤')
+      return
+    }
+    
+    console.log('[useTutorial] 当前步骤:', step.id, '需要动作:', step.requiredAction)
 
     switch (step.requiredAction) {
       case 'move':
