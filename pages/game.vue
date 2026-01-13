@@ -3,6 +3,7 @@ import GameCanvas from '~/components/game/GameCanvas.vue'
 import { useGesture } from '~/composables/useGesture'
 import { useGestureActions } from '~/composables/useGestureActions'
 import { useTutorial } from '~/composables/useTutorial'
+import { useLevel } from '~/composables/useLevel'
 
 const route = useRoute()
 const isTutorialMode = computed(() => route.query.level === 'tutorial')
@@ -46,14 +47,26 @@ const {
   generateTarget
 } = useTutorial()
 
+// 关卡系统
+const { levelStatus, startLevel, endLevel } = useLevel()
+
 // 教程模式初始化
 onMounted(() => {
   if (isTutorialMode.value) {
     startTutorial()
+    startLevel('tutorial')
     // 生成第一个目标
     nextTick(() => {
       generateTarget(window.innerWidth, window.innerHeight)
     })
+  }
+})
+
+// 监听教程完成，解锁下一关
+watch(isTutorialComplete, (complete) => {
+  if (complete && isTutorialMode.value) {
+    console.log('[game] 教程完成，解锁下一关')
+    endLevel(true)  // 标记教程关卡完成，解锁下一关
   }
 })
 
