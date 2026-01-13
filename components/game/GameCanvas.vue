@@ -8,6 +8,17 @@ import type { Sword, InkTrail } from '~/types/game'
 // Props
 const props = defineProps<{
   gestureMode?: boolean
+  tutorialMode?: boolean
+  targetPosition?: { x: number; y: number }
+  showTarget?: boolean
+}>()
+
+// Emits
+const emit = defineEmits<{
+  'sword-move': [pos: { x: number; y: number }]
+  'sword-slash': []
+  'sword-charge': [data: { chargeLevel: number }]
+  'sword-thrust': []
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -111,7 +122,14 @@ const updateCanvasSize = () => {
 const handleMouseMove = (event: MouseEvent) => {
   if (!containerRef.value) return
   const rect = containerRef.value.getBoundingClientRect()
-  updatePosition(event.clientX - rect.left, event.clientY - rect.top)
+  const x = event.clientX - rect.left
+  const y = event.clientY - rect.top
+  updatePosition(x, y)
+  
+  // 教程模式：发射移动事件
+  if (props.tutorialMode) {
+    emit('sword-move', { x, y })
+  }
 }
 
 // 鼠标按下处理（区分左右键）
@@ -387,13 +405,25 @@ watch(() => attackState.value.type, (newType, oldType) => {
     if (newType === 'slash') {
       emitInkSplash(pos.x, pos.y, 8, dir)
       playSound('slash')
+      // 教程模式：发射斩击事件
+      if (props.tutorialMode) {
+        emit('sword-slash')
+      }
     } else if (newType === 'charge') {
       emitSparks(pos.x, pos.y, 20)
       emitInkSplash(pos.x, pos.y, 15, dir)
       playSound('release')
+      // 教程模式：发射蓄力事件
+      if (props.tutorialMode) {
+        emit('sword-charge', { chargeLevel: attackState.value.chargeLevel })
+      }
     } else if (newType === 'thrust') {
       emitDust(pos.x, pos.y, 8)
       playSound('thrust')
+      // 教程模式：发射突刺事件
+      if (props.tutorialMode) {
+        emit('sword-thrust')
+      }
     }
   }
 })
@@ -425,10 +455,59 @@ const render = (timestamp: number) => {
   drawChargeIndicator(ctx)
   drawGatherSwords(ctx)
   drawShield(ctx)
+  drawTutorialTarget(ctx)  // 教程目标
   drawSword(ctx)
   drawComboIndicator(ctx)
   
   animationFrameId = requestAnimationFrame(render)
+}
+
+// 绘制教程目标
+const drawTutorialTarget = (ctx: CanvasRenderingContext2D) => {
+  if (!props.tutorialMode || !props.showTarget || !props.targetPosition) return
+  
+  const { x, y } = props.targetPosition
+  const radius = 50
+  const time = Date.now() * 0.003
+  
+  ctx.save()
+  
+  // 外圈脉冲
+  const pulseRadius = radius + Math.sin(time) * 10
+  ctx.beginPath()
+  ctx.arc(x, y, pulseRadius, 0, Math.PI * 2)
+  ctx.strokeStyle = 'rgba(212, 165, 116, 0.5)'
+  ctx.lineWidth = 2
+  ctx.stroke()
+  
+  // 内圈
+  ctx.beginPath()
+  ctx.arc(x, y, radius * 0.6, 0, Math.PI * 2)
+  ctx.strokeStyle = 'rgba(212, 165, 116, 0.8)'
+  ctx.lineWidth = 3
+  ctx.stroke()
+  
+  // 中心点
+  ctx.beginPath()
+  ctx.arc(x, y, 5, 0, Math.PI * 2)
+  ctx.fillStyle = CONFIG.vermilion
+  ctx.fill()
+  
+  // 十字准星
+  ctx.strokeStyle = 'rgba(212, 165, 116, 0.6)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(x - radius, y)
+  ctx.lineTo(x - 15, y)
+  ctx.moveTo(x + 15, y)
+  ctx.lineTo(x + radius, y)
+  ctx.moveTo(x, y - radius)
+  ctx.lineTo(x, y - 15)
+  ctx.moveTo(x, y + 15)
+  ctx.lineTo(x, y + radius)
+  ctx.stroke()
+  
+  ctx.restore()
 }
 
 // 绘制护盾
