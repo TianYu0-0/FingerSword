@@ -232,7 +232,7 @@ export function useSword() {
     sword.value.chargeLevel = 0
   }
 
-  // 瞬移突刺
+  // 瞬移突刺（沿当前方向快速刺一下再返回）
   const thrust = (targetX: number, targetY: number) => {
     console.log('[useSword] thrust:', targetX, targetY, 'isAttacking:', attackState.value.isAttacking)
     // 突刺可以打断普通斩击
@@ -241,34 +241,47 @@ export function useSword() {
       return
     }
 
-    const dx = targetX - sword.value.position.x
-    const dy = targetY - sword.value.position.y
-    const dist = Math.hypot(dx, dy)
+    // 使用剑当前的方向（基于剑的角度）
+    const direction = {
+      x: Math.cos(sword.value.angle),
+      y: Math.sin(sword.value.angle)
+    }
+    
+    // 保存原始位置
+    const originalX = sword.value.position.x
+    const originalY = sword.value.position.y
+    const thrustDistance = 150  // 突刺距离
 
     attackState.value = {
       isAttacking: true,
       type: 'thrust',
       chargeLevel: 0,
       startTime: Date.now(),
-      direction: { x: dx / dist, y: dy / dist }
+      direction
     }
 
-    // 快速移动到目标位置
-    sword.value.position.x = targetX
-    sword.value.position.y = targetY
-    targetPosition.value = { x: targetX, y: targetY }
+    // 快速前刺
+    sword.value.position.x = originalX + direction.x * thrustDistance
+    sword.value.position.y = originalY + direction.y * thrustDistance
 
     // 添加突刺特效
     effects.value.push({
       id: generateId(),
       type: 'thrust',
-      position: { ...sword.value.position },
-      direction: { ...attackState.value.direction },
-      size: 30,
+      position: { x: originalX, y: originalY },
+      direction,
+      size: thrustDistance,
       opacity: 1,
       age: 0,
       maxAge: 200
     })
+
+    // 延迟返回原位置
+    setTimeout(() => {
+      sword.value.position.x = originalX
+      sword.value.position.y = originalY
+      targetPosition.value = { x: originalX, y: originalY }
+    }, 100)
   }
 
   // 鼠标按下
