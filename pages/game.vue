@@ -43,6 +43,8 @@ const modeNames = {
 
 // 选择控制模式
 const selectControlMode = async (mode: 'mouse' | 'touch' | 'gesture') => {
+  console.log('[game] selectControlMode:', mode)
+  
   // 如果从手势模式切换出去，停止手势识别
   if (controlMode.value === 'gesture' && mode !== 'gesture') {
     stop()
@@ -53,11 +55,17 @@ const selectControlMode = async (mode: 'mouse' | 'touch' | 'gesture') => {
   // 如果切换到手势模式
   if (mode === 'gesture') {
     showGesturePanel.value = true
+    // 等待 DOM 更新后再初始化
+    await nextTick()
+    console.log('[game] videoRef.value:', videoRef.value)
     if (videoRef.value) {
       const success = await initialize(videoRef.value)
+      console.log('[game] initialize result:', success)
       if (success) {
         controlMode.value = mode
       }
+    } else {
+      console.error('[game] videoRef 为空，无法初始化手势识别')
     }
   } else {
     controlMode.value = mode
