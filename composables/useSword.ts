@@ -356,32 +356,44 @@ export function useSword() {
     if (!gatherState.value.isGathering) return
     if (gatherState.value.swords.length === 0) return
 
+    // 使用主剑的方向作为发射方向
+    const mainDirection = {
+      x: Math.cos(sword.value.angle),
+      y: Math.sin(sword.value.angle)
+    }
+
     attackState.value = {
       isAttacking: true,
       type: 'swordRain',
       chargeLevel: 1,
       startTime: Date.now(),
-      direction: { x: 0, y: -1 }
+      direction: mainDirection
     }
 
-    // 为每把聚集的剑添加特效
+    // 为每把聚集的剑添加特效，全部沿主剑方向发射
     gatherState.value.swords.forEach((s, i) => {
       setTimeout(() => {
+        // 添加少量随机散布
+        const spread = (Math.random() - 0.5) * 0.3
+        const dirX = mainDirection.x + spread * mainDirection.y
+        const dirY = mainDirection.y - spread * mainDirection.x
+        
         effects.value.push({
           id: generateId(),
           type: 'swordRain',
           position: { x: s.x, y: s.y },
-          direction: { 
-            x: Math.cos(s.angle), 
-            y: Math.sin(s.angle) 
-          },
-          size: 40,
+          direction: { x: dirX, y: dirY },
+          size: 50,
           opacity: 1,
           age: 0,
-          maxAge: 400,
-          extra: { startX: s.x, startY: s.y }
+          maxAge: 600,
+          extra: { 
+            startX: s.x, 
+            startY: s.y,
+            angle: Math.atan2(dirY, dirX)  // 保存发射角度
+          }
         })
-      }, i * 50) // 依次发射
+      }, i * 30) // 加快发射间隔
     })
 
     // 重置聚剑状态
@@ -401,14 +413,19 @@ export function useSword() {
     if (!gatherState.value.isGathering) return
 
     const elapsed = Date.now() - gatherState.value.startTime
-    const maxSwords = 8
+    const maxSwords = 24  // 增加到24把剑
 
-    // 每 200ms 添加一把剑
-    const shouldHaveSwords = Math.min(maxSwords, Math.floor(elapsed / 200))
+    // 每 100ms 添加一把剑（加快生成速度）
+    const shouldHaveSwords = Math.min(maxSwords, Math.floor(elapsed / 100))
     
     while (gatherState.value.swords.length < shouldHaveSwords) {
-      const angle = (gatherState.value.swords.length / maxSwords) * Math.PI * 2
-      const radius = 80
+      const index = gatherState.value.swords.length
+      // 多圈分布
+      const ring = Math.floor(index / 8)  // 每圈8把剑
+      const indexInRing = index % 8
+      const angle = (indexInRing / 8) * Math.PI * 2 + ring * 0.3
+      const radius = 60 + ring * 40  // 不同圈不同半径
+      
       gatherState.value.swords.push({
         id: generateId(),
         x: sword.value.position.x + Math.cos(angle) * radius,
@@ -417,10 +434,13 @@ export function useSword() {
       })
     }
 
-    // 更新剑的位置跟随主剑
+    // 更新剑的位置跟随主剑（旋转效果）
     gatherState.value.swords.forEach((s, i) => {
-      const angle = (i / maxSwords) * Math.PI * 2 + Date.now() * 0.002
-      const radius = 80
+      const ring = Math.floor(i / 8)
+      const indexInRing = i % 8
+      const rotationSpeed = 0.003 - ring * 0.0005  // 内圈转得快
+      const angle = (indexInRing / 8) * Math.PI * 2 + ring * 0.3 + Date.now() * rotationSpeed
+      const radius = 60 + ring * 40
       s.x = sword.value.position.x + Math.cos(angle) * radius
       s.y = sword.value.position.y + Math.sin(angle) * radius
       s.angle = angle + Math.PI / 2

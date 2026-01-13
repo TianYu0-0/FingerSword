@@ -436,21 +436,23 @@ const drawGatherSwords = (ctx: CanvasRenderingContext2D) => {
     ctx.save()
     ctx.translate(s.x, s.y)
     ctx.rotate(s.angle)
-    ctx.globalAlpha = 0.7
+    ctx.globalAlpha = 0.8
     
-    // 简化的剑形状
-    const gradient = ctx.createLinearGradient(-3, -30, 3, 30)
-    gradient.addColorStop(0, CONFIG.inkColor)
-    gradient.addColorStop(1, CONFIG.inkLightColor)
-    
-    ctx.fillStyle = gradient
-    ctx.beginPath()
-    ctx.moveTo(0, -30)
-    ctx.lineTo(3, 0)
-    ctx.lineTo(0, 5)
-    ctx.lineTo(-3, 0)
-    ctx.closePath()
-    ctx.fill()
+    // 使用图片绘制剑
+    if (swordImage.value) {
+      const imgSize = 50
+      ctx.drawImage(swordImage.value, -imgSize / 2, -imgSize / 2, imgSize, imgSize)
+    } else {
+      // 备用绘制
+      ctx.fillStyle = CONFIG.inkColor
+      ctx.beginPath()
+      ctx.moveTo(0, -25)
+      ctx.lineTo(4, 0)
+      ctx.lineTo(0, 8)
+      ctx.lineTo(-4, 0)
+      ctx.closePath()
+      ctx.fill()
+    }
     
     ctx.restore()
   })
