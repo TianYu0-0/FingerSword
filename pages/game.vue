@@ -4,7 +4,8 @@ import { useGesture } from '~/composables/useGesture'
 import { useGestureActions } from '~/composables/useGestureActions'
 
 const showHelp = ref(false)
-const controlMode = ref<'mouse' | 'gesture'>('mouse')
+const showModeSelector = ref(false)
+const controlMode = ref<'mouse' | 'touch' | 'gesture'>('mouse')
 const showGesturePanel = ref(false)
 const videoRef = ref<HTMLVideoElement | null>(null)
 const gameCanvasRef = ref<InstanceType<typeof GameCanvas> | null>(null)
@@ -24,6 +25,44 @@ const {
   processGesture,
   reset: resetGestureActions
 } = useGestureActions()
+
+// 控制模式图标
+const modeIcons = {
+  mouse: '🖱️',
+  touch: '👆',
+  gesture: '✋'
+}
+
+const modeNames = {
+  mouse: '鼠标模式',
+  touch: '触摸模式',
+  gesture: '手势模式'
+}
+
+// 选择控制模式
+const selectControlMode = async (mode: 'mouse' | 'touch' | 'gesture') => {
+  // 如果从手势模式切换出去，停止手势识别
+  if (controlMode.value === 'gesture' && mode !== 'gesture') {
+    stop()
+    showGesturePanel.value = false
+    resetGestureActions()
+  }
+  
+  // 如果切换到手势模式
+  if (mode === 'gesture') {
+    showGesturePanel.value = true
+    if (videoRef.value) {
+      const success = await initialize(videoRef.value)
+      if (success) {
+        controlMode.value = mode
+      }
+    }
+  } else {
+    controlMode.value = mode
+  }
+  
+  showModeSelector.value = false
+}
 
 // 切换手势控制
 const toggleGestureControl = async () => {
@@ -70,13 +109,28 @@ watch(gestureState, (newState) => {
     <header class="game-header">
       <NuxtLink to="/" class="back-btn ink-card">← 返回</NuxtLink>
       <div class="header-right">
-        <button 
-          class="gesture-btn ink-card" 
-          :class="{ active: controlMode === 'gesture' }"
-          @click="toggleGestureControl"
-        >
-          {{ controlMode === 'gesture' ? '✋' : '🖱️' }}
-        </button>
+        <div class="mode-selector-wrapper">
+          <button 
+            class="mode-btn ink-card" 
+            @click="showModeSelector = !showModeSelector"
+          >
+            {{ modeIcons[controlMode] }}
+          </button>
+          <Transition name="slide">
+            <div v-if="showModeSelector" class="mode-dropdown ink-card">
+              <button 
+                v-for="mode in ['mouse', 'touch', 'gesture'] as const" 
+                :key="mode"
+                class="mode-option"
+                :class="{ active: controlMode === mode }"
+                @click="selectControlMode(mode)"
+              >
+                <span class="mode-icon">{{ modeIcons[mode] }}</span>
+                <span class="mode-name">{{ modeNames[mode] }}</span>
+              </button>
+            </div>
+          </Transition>
+        </div>
         <button class="help-btn ink-card" @click="showHelp = !showHelp">?</button>
       </div>
     </header>
@@ -219,7 +273,12 @@ watch(gestureState, (newState) => {
   gap: 0.5rem;
 }
 
-.gesture-btn {
+.mode-selector-wrapper {
+  position: relative;
+  pointer-events: auto;
+}
+
+.mode-btn {
   width: 2.5rem;
   height: 2.5rem;
   display: flex;
@@ -231,9 +290,62 @@ watch(gestureState, (newState) => {
   transition: all 0.2s;
 }
 
-.gesture-btn.active {
+.mode-btn:hover {
+  background-color: rgba(107, 107, 107, 0.1);
+}
+
+.mode-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  min-width: 140px;
+  z-index: 30;
+}
+
+.mode-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.mode-option:hover {
+  background-color: rgba(107, 107, 107, 0.1);
+}
+
+.mode-option.active {
   background-color: rgba(196, 30, 58, 0.1);
-  border-color: #C41E3A;
+  color: #C41E3A;
+}
+
+.mode-icon {
+  font-size: 1.25rem;
+}
+
+.mode-name {
+  font-size: 0.875rem;
+  color: #1A1A1A;
+}
+
+.mode-option.active .mode-name {
+  color: #C41E3A;
+}
+
+.slide-enter-active, .slide-leave-active {
+  transition: all 0.2s ease;
+}
+
+.slide-enter-from, .slide-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 
 .gesture-panel {

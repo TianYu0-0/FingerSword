@@ -32,7 +32,7 @@ const handleStart = () => {
       
       <!-- 装饰剑图案 -->
       <div class="sword-icon ink-brush-animate delay-2 animate-float">
-        <img src="/images/sword.jpg" alt="仙剑" class="sword-image" />
+        <img src="/images/sword.png" alt="仙剑" class="sword-image" />
         <div class="sword-glow"></div>
       </div>
       
