@@ -57,12 +57,12 @@ const handleStart = () => {
 
 <style scoped>
 .home-container {
-  position: relative;
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
   overflow: hidden;
 }
 
