@@ -235,8 +235,9 @@ export function useSword() {
   // 瞬移突刺
   const thrust = (targetX: number, targetY: number) => {
     console.log('[useSword] thrust:', targetX, targetY, 'isAttacking:', attackState.value.isAttacking)
-    if (attackState.value.isAttacking) {
-      console.log('[useSword] thrust 被阻止：正在攻击中')
+    // 突刺可以打断普通斩击
+    if (attackState.value.isAttacking && attackState.value.type !== 'slash') {
+      console.log('[useSword] thrust 被阻止：正在进行其他攻击')
       return
     }
 
