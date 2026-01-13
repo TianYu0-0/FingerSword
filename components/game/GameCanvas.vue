@@ -398,7 +398,7 @@ const drawSword = (ctx: CanvasRenderingContext2D) => {
 
 // 监听攻击状态变化
 watch(() => attackState.value.type, (newType, oldType) => {
-  if (newType && !oldType) {
+  if (newType && newType !== oldType) {
     const pos = sword.value.position
     const dir = attackState.value.direction
     
