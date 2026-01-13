@@ -353,14 +353,23 @@ export function useSword() {
 
   // 万剑归宗（右键长按释放）
   const swordRain = () => {
-    if (!gatherState.value.isGathering) return
-    if (gatherState.value.swords.length === 0) return
+    console.log('[swordRain] 触发，isGathering:', gatherState.value.isGathering, 'swords:', gatherState.value.swords.length)
+    
+    if (!gatherState.value.isGathering) {
+      console.log('[swordRain] 未在聚剑状态，跳过')
+      return
+    }
+    if (gatherState.value.swords.length === 0) {
+      console.log('[swordRain] 没有聚集的剑，跳过')
+      return
+    }
 
     // 使用主剑的方向作为发射方向
     const mainDirection = {
       x: Math.cos(sword.value.angle),
       y: Math.sin(sword.value.angle)
     }
+    console.log('[swordRain] 发射方向:', mainDirection, '剑数量:', gatherState.value.swords.length)
 
     attackState.value = {
       isAttacking: true,
@@ -370,13 +379,23 @@ export function useSword() {
       direction: mainDirection
     }
 
+    // 保存剑的副本（因为即将清空）
+    const swordsToFire = [...gatherState.value.swords]
+    console.log('[swordRain] 准备发射剑数:', swordsToFire.length)
+
+    // 先重置聚剑状态
+    gatherState.value.isGathering = false
+    gatherState.value.swords = []
+
     // 为每把聚集的剑添加特效，全部沿主剑方向发射
-    gatherState.value.swords.forEach((s, i) => {
+    swordsToFire.forEach((s, i) => {
       setTimeout(() => {
         // 添加少量随机散布
         const spread = (Math.random() - 0.5) * 0.3
         const dirX = mainDirection.x + spread * mainDirection.y
         const dirY = mainDirection.y - spread * mainDirection.x
+        
+        console.log('[swordRain] 发射剑', i, 'position:', s.x, s.y)
         
         effects.value.push({
           id: generateId(),
@@ -395,10 +414,6 @@ export function useSword() {
         })
       }, i * 30) // 加快发射间隔
     })
-
-    // 重置聚剑状态
-    gatherState.value.isGathering = false
-    gatherState.value.swords = []
   }
 
   // 开始聚剑（右键按下）
