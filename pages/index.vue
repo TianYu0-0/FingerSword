@@ -31,20 +31,7 @@ const handleStart = () => {
       
       <!-- 装饰剑图案 -->
       <div class="sword-icon animate-float">
-        <svg viewBox="0 0 100 100">
-          <defs>
-            <linearGradient id="swordGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stop-color="#3D3D3D"/>
-              <stop offset="50%" stop-color="#9A9A9A"/>
-              <stop offset="100%" stop-color="#3D3D3D"/>
-            </linearGradient>
-          </defs>
-          <path d="M50,5 L56,65 L50,80 L44,65 Z" fill="url(#swordGradient)" stroke="#1A1A1A" stroke-width="0.8"/>
-          <path d="M50,10 L52,45 L50,55 L48,45 Z" fill="white" fill-opacity="0.4"/>
-          <ellipse cx="50" cy="65" rx="14" ry="4" fill="#C41E3A" stroke="#1A1A1A" stroke-width="0.5"/>
-          <rect x="45" y="65" width="10" height="18" fill="#8B6914" stroke="#1A1A1A" stroke-width="0.5"/>
-          <ellipse cx="50" cy="83" rx="6" ry="2" fill="#6B5010" stroke="#1A1A1A" stroke-width="0.3"/>
-        </svg>
+        <img src="/images/sword.jpg" alt="仙剑" class="sword-image" />
         <div class="sword-glow"></div>
       </div>
       
@@ -140,10 +127,12 @@ const handleStart = () => {
   margin-bottom: 3rem;
 }
 
-.sword-icon svg {
+.sword-image {
   width: 100%;
   height: 100%;
+  object-fit: contain;
   filter: drop-shadow(0 4px 6px rgba(26, 26, 26, 0.3));
+  border-radius: 8px;
 }
 
 .sword-glow {
