@@ -12,10 +12,11 @@ const isSlayMonsterMode = computed(() => levelId.value === 'slayMonster')
 
 const showHelp = ref(false)
 const showModeSelector = ref(false)
-const controlMode = ref<'mouse' | 'touch' | 'gesture'>('mouse')
+const controlMode = ref<'mouse' | 'gesture'>('gesture')  // 默认为手势模式
 const showGesturePanel = ref(false)
 const videoRef = ref<HTMLVideoElement | null>(null)
 const gameCanvasRef = ref<InstanceType<typeof GameCanvas> | null>(null)
+const containerRef = ref<HTMLDivElement | null>(null)
 
 const { 
   isInitialized, 
@@ -80,30 +81,43 @@ onMounted(() => {
       generateTarget(window.innerWidth, window.innerHeight)
     })
   }
-  
+
   // 御剑斩妖模式初始化
   if (isSlayMonsterMode.value) {
     startLevel('slayMonster')
-    
+
     // 敌人生成定时器
     spawnTimer = setInterval(() => {
       if (levelState.value.isPlaying && !levelState.value.isPaused) {
         spawnEnemy(window.innerWidth, window.innerHeight)
       }
     }, 1500)
-    
+
     // 游戏循环（更新时间和敌人）
     gameLoopTimer = setInterval(() => {
       if (levelState.value.isPlaying && !levelState.value.isPaused) {
         updateTime(0.1)  // 每100ms更新一次
         updateEnemies(0.1, window.innerWidth, window.innerHeight)  // 更新敌人位置
-        
+
         // 检查时间是否结束
         if (levelState.value.timeRemaining <= 0) {
           handleLevelEnd()
         }
       }
     }, 100)
+  }
+
+  // 自动初始化手势模式
+  if (controlMode.value === 'gesture') {
+    showGesturePanel.value = true
+    nextTick(async () => {
+      if (videoRef.value) {
+        const success = await initialize(videoRef.value)
+        if (success) {
+          setupGestureCallbacks()
+        }
+      }
+    })
   }
 })
 
@@ -167,27 +181,123 @@ watch(isTutorialComplete, (complete) => {
 // 控制模式图标
 const modeIcons = {
   mouse: '🖱️',
-  touch: '👆',
   gesture: '✋'
 }
 
 const modeNames = {
   mouse: '鼠标模式',
-  touch: '触摸模式',
   gesture: '手势模式'
 }
 
+// 手势类型中文映射
+const gestureNames: Record<string, string> = {
+  pointing: '食指指向',
+  fist: '握拳',
+  palm: '张开手掌',
+  thumbsUp: '竖大拇指',
+  twoFingers: '双指并拢',
+  none: '无手势'
+}
+
+// 动作类型中文映射
+const actionNames: Record<string, string> = {
+  move: '移动',
+  slash: '斩击',
+  charge: '蓄力中',
+  release: '释放蓄力',
+  gather: '聚剑',
+  swordRain: '万剑齐发',
+  wave: '剑气波',
+  thrust: '突刺',
+  sweep: '横扫',
+  none: '无'
+}
+
+// 设置手势动作回调
+const setupGestureCallbacks = () => {
+  if (!gameCanvasRef.value) {
+    console.error('[game] gameCanvasRef 为空，无法设置手势回调')
+    return
+  }
+
+  setCallbacks({
+    onMove: (x: number, y: number) => {
+      // 更新剑的位置
+      gameCanvasRef.value?.updatePosition(x, y)
+
+      // 教程模式：发射移动事件
+      if (isTutorialMode.value) {
+        handleTutorialAction('move', { x, y })
+      }
+    },
+    onSlash: () => {
+      // 触发斩击
+      gameCanvasRef.value?.onMouseDown(new MouseEvent('mousedown', { button: 0 }))
+      setTimeout(() => {
+        gameCanvasRef.value?.onMouseUp(new MouseEvent('mouseup', { button: 0 }))
+      }, 50)
+
+      // 教程模式：发射斩击事件
+      if (isTutorialMode.value) {
+        handleTutorialAction('slash')
+      }
+    },
+    onCharge: (chargeLevel: number) => {
+      // 握拳 -> 开始蓄力（模拟鼠标左键按住）
+      console.log('[game] 开始蓄力')
+      gameCanvasRef.value?.onMouseDown(new MouseEvent('mousedown', { button: 0 }))
+
+      // 教程模式：发射蓄力事件
+      if (isTutorialMode.value) {
+        handleTutorialAction('charge', { chargeLevel })
+      }
+    },
+    onRelease: (chargeLevel: number) => {
+      // 张开手掌 -> 释放蓄力（模拟鼠标左键松开）
+      console.log('[game] 释放蓄力:', chargeLevel)
+      gameCanvasRef.value?.onMouseUp(new MouseEvent('mouseup', { button: 0 }))
+    },
+    onGather: () => {
+      // 开始聚剑
+      gameCanvasRef.value?.onRightMouseDown()
+    },
+    onSwordRain: () => {
+      // 万剑齐发
+      gameCanvasRef.value?.onRightMouseUp()
+    },
+    onWave: () => {
+      // 剑气波
+      gameCanvasRef.value?.wave()
+    },
+    onThrust: () => {
+      // 突刺
+      gameCanvasRef.value?.onDoubleClick()
+
+      // 教程模式：发射突刺事件
+      if (isTutorialMode.value) {
+        handleTutorialAction('thrust')
+      }
+    },
+    onSweep: () => {
+      // 横扫
+      gameCanvasRef.value?.sweep()
+    }
+  })
+
+  console.log('[game] 手势回调已设置')
+}
+
 // 选择控制模式
-const selectControlMode = async (mode: 'mouse' | 'touch' | 'gesture') => {
+const selectControlMode = async (mode: 'mouse' | 'gesture') => {
   console.log('[game] selectControlMode:', mode)
-  
+
   // 如果从手势模式切换出去，停止手势识别
   if (controlMode.value === 'gesture' && mode !== 'gesture') {
     stop()
     showGesturePanel.value = false
     resetGestureActions()
   }
-  
+
   // 如果切换到手势模式
   if (mode === 'gesture') {
     showGesturePanel.value = true
@@ -199,6 +309,8 @@ const selectControlMode = async (mode: 'mouse' | 'touch' | 'gesture') => {
       console.log('[game] initialize result:', success)
       if (success) {
         controlMode.value = mode
+        // 设置手势回调
+        setupGestureCallbacks()
       }
     } else {
       console.error('[game] videoRef 为空，无法初始化手势识别')
@@ -206,7 +318,7 @@ const selectControlMode = async (mode: 'mouse' | 'touch' | 'gesture') => {
   } else {
     controlMode.value = mode
   }
-  
+
   showModeSelector.value = false
 }
 
@@ -216,12 +328,16 @@ const toggleGestureControl = async () => {
     controlMode.value = 'mouse'
     showGesturePanel.value = false
     stop()
+    resetGestureActions()
   } else {
     showGesturePanel.value = true
+    await nextTick()
     if (videoRef.value) {
       const success = await initialize(videoRef.value)
       if (success) {
         controlMode.value = 'gesture'
+        // 设置手势回调
+        setupGestureCallbacks()
       }
     }
   }
@@ -240,16 +356,23 @@ const closeGesturePanel = () => {
 // 手势状态变化时处理动作
 watch(gestureState, (newState) => {
   if (controlMode.value === 'gesture' && isInitialized.value) {
-    // 使用画布尺寸进行坐标映射
-    const canvasWidth = window.innerWidth
-    const canvasHeight = window.innerHeight
+    // 获取实际画布尺寸
+    let canvasWidth = window.innerWidth
+    let canvasHeight = window.innerHeight
+
+    if (containerRef.value) {
+      const rect = containerRef.value.getBoundingClientRect()
+      canvasWidth = rect.width
+      canvasHeight = rect.height
+    }
+
     processGesture(newState, canvasWidth, canvasHeight)
   }
 }, { deep: true })
 </script>
 
 <template>
-  <div class="game-container">
+  <div ref="containerRef" class="game-container">
     <GameCanvas 
       ref="gameCanvasRef" 
       class="canvas-layer" 
@@ -354,8 +477,8 @@ watch(gestureState, (newState) => {
           </button>
           <Transition name="slide">
             <div v-if="showModeSelector" class="mode-dropdown ink-card">
-              <button 
-                v-for="mode in ['mouse', 'touch', 'gesture'] as const" 
+              <button
+                v-for="mode in ['mouse', 'gesture'] as const"
                 :key="mode"
                 class="mode-option"
                 :class="{ active: controlMode === mode }"
@@ -402,16 +525,40 @@ watch(gestureState, (newState) => {
           </div>
           <div v-else-if="isInitialized" class="gesture-status success">
             <span class="success-icon">✓</span>
-            识别中: {{ gestureState.type === 'none' ? '等待手势' : gestureState.type }}
+            <div class="status-info">
+              <div class="status-row">
+                <span class="status-label">手势:</span>
+                <span class="status-value" :class="gestureState.type !== 'none' ? 'active' : ''">
+                  {{ gestureNames[gestureState.type] || gestureState.type }}
+                </span>
+              </div>
+              <div class="status-row">
+                <span class="status-label">置信度:</span>
+                <span class="status-value">{{ (gestureState.confidence * 100).toFixed(0) }}%</span>
+                <div class="confidence-bar">
+                  <div class="confidence-fill" :style="{ width: `${gestureState.confidence * 100}%` }"></div>
+                </div>
+              </div>
+              <div class="status-row" v-if="gestureState.type !== 'none'">
+                <span class="status-label">位置:</span>
+                <span class="status-value">
+                  ({{ (gestureState.position.x * 100).toFixed(0) }}, {{ (gestureState.position.y * 100).toFixed(0) }})
+                </span>
+              </div>
+              <div class="status-row" v-if="gestureActionState.currentAction !== 'none'">
+                <span class="status-label">动作:</span>
+                <span class="status-value action">{{ actionNames[gestureActionState.currentAction] || gestureActionState.currentAction }}</span>
+              </div>
+            </div>
           </div>
         </div>
         
         <div class="gesture-tips">
           <p>👆 食指指向 - 控制剑位置</p>
-          <p>✊ 握拳 - 聚剑蓄力</p>
-          <p>🖐️ 张开手掌 - 剑气冲击波</p>
-          <p>👌 OK手势 - 瞬移突刺</p>
-          <p>👍 竖大拇指 - 剑气护盾</p>
+          <p>✌️ 双指并拢保持3秒 - 聚剑</p>
+          <p>✌️ 结束双指并拢 - 万剑齐发</p>
+          <p>✊ 握拳保持3秒 - 开始蓄力</p>
+          <p>🖐️ 张开手掌 - 释放蓄力</p>
         </div>
         <button class="close-btn" @click="closeGesturePanel">关闭</button>
       </div>
@@ -420,13 +567,25 @@ watch(gestureState, (newState) => {
     <Transition name="fade">
       <div v-if="showHelp" class="help-panel ink-card">
         <h3 class="help-title">操作说明</h3>
-        <ul class="help-list">
+
+        <!-- 鼠标模式操作说明 -->
+        <ul v-if="controlMode === 'mouse'" class="help-list">
           <li><span class="highlight">移动鼠标</span> - 控制剑的位置</li>
           <li><span class="highlight">左键单击</span> - 剑气斩击</li>
           <li><span class="highlight">左键长按</span> - 蓄力斩</li>
           <li><span class="highlight">右键长按</span> - 聚剑</li>
           <li><span class="highlight">右键松开</span> - 万剑齐发</li>
         </ul>
+
+        <!-- 手势模式操作说明 -->
+        <ul v-else-if="controlMode === 'gesture'" class="help-list">
+          <li><span class="highlight">👆 食指指向</span> - 控制剑位置</li>
+          <li><span class="highlight">✌️ 双指并拢保持3秒</span> - 聚剑</li>
+          <li><span class="highlight">✌️ 结束双指并拢</span> - 万剑齐发</li>
+          <li><span class="highlight">✊ 握拳保持3秒</span> - 开始蓄力</li>
+          <li><span class="highlight">🖐️ 张开手掌</span> - 释放蓄力</li>
+        </ul>
+
         <button class="close-btn" @click="showHelp = false">关闭</button>
       </div>
     </Transition>
@@ -649,6 +808,54 @@ watch(gestureState, (newState) => {
 
 .gesture-status.success {
   color: #2E7D32;
+}
+
+.status-info {
+  margin-top: 0.5rem;
+  text-align: left;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0;
+  font-size: 0.75rem;
+}
+
+.status-label {
+  color: #6B6B6B;
+  min-width: 50px;
+}
+
+.status-value {
+  color: #1A1A1A;
+  font-weight: 500;
+}
+
+.status-value.active {
+  color: #2E7D32;
+  font-weight: 600;
+}
+
+.status-value.action {
+  color: #C41E3A;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.confidence-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(107, 107, 107, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.confidence-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #C41E3A, #2E7D32);
+  transition: width 0.2s ease;
 }
 
 .gesture-tips {

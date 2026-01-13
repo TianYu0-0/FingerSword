@@ -735,6 +735,20 @@ onUnmounted(() => {
   if (animationFrameId) cancelAnimationFrame(animationFrameId)
   if (unbindTouch) unbindTouch()
 })
+
+// 暴露方法给父组件（用于手势控制）
+defineExpose({
+  updatePosition,
+  onMouseDown,
+  onMouseUp,
+  onDoubleClick,
+  onRightMouseDown,
+  onRightMouseUp,
+  wave,
+  spin,
+  shield,
+  sweep
+})
 </script>
 
 <template>

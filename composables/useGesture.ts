@@ -1,10 +1,9 @@
-export type GestureType = 
+export type GestureType =
   | 'pointing'      // 食指指向
   | 'fist'          // 握拳
   | 'palm'          // 张开五指
-  | 'pinch'         // 双指捏合
   | 'thumbsUp'      // 竖大拇指
-  | 'ok'            // OK 手势
+  | 'twoFingers'    // 双指并拢
   | 'none'          // 无手势
 
 export type GestureState = {
@@ -38,8 +37,8 @@ export function useGesture() {
   let lastPosition = { x: 0.5, y: 0.5 }
   let lastTime = Date.now()
 
-  const detectGestureType = (landmarks: any[]): GestureType => {
-    if (!landmarks || landmarks.length < 21) return 'none'
+  const detectGestureType = (landmarks: any[]): { type: GestureType; confidence: number } => {
+    if (!landmarks || landmarks.length < 21) return { type: 'none', confidence: 0 }
 
     // 手指关键点索引
     const thumbTip = landmarks[4]
@@ -47,54 +46,79 @@ export function useGesture() {
     const middleTip = landmarks[12]
     const ringTip = landmarks[16]
     const pinkyTip = landmarks[20]
-    
+
     const thumbIP = landmarks[3]
     const indexPIP = landmarks[6]
     const middlePIP = landmarks[10]
     const ringPIP = landmarks[14]
     const pinkyPIP = landmarks[18]
-    
-    // 判断手指是否伸直
-    const isFingerExtended = (tip: any, pip: any) => tip.y < pip.y
-    
+
+    const wrist = landmarks[0]
+    const thumbMCP = landmarks[2]  // 拇指掌骨关节
+
+    // 判断手指是否伸直（更严格的判断）
+    const isFingerExtended = (tip: any, pip: any, threshold: number = 0.05) => {
+      const distance = tip.y - pip.y
+      return distance < -threshold  // 负值表示向上伸直
+    }
+
     const indexExtended = isFingerExtended(indexTip, indexPIP)
     const middleExtended = isFingerExtended(middleTip, middlePIP)
     const ringExtended = isFingerExtended(ringTip, ringPIP)
     const pinkyExtended = isFingerExtended(pinkyTip, pinkyPIP)
-    const thumbExtended = thumbTip.x < thumbIP.x // 简化判断
 
-    // 握拳：所有手指都弯曲
+    // 拇指伸直判断（改进版：考虑多个维度）
+    const thumbDistance = Math.hypot(thumbTip.x - thumbMCP.x, thumbTip.y - thumbMCP.y)
+    const thumbToWrist = Math.hypot(thumbTip.x - wrist.x, thumbTip.y - wrist.y)
+    const thumbExtended = thumbDistance > 0.08 && thumbToWrist > 0.15
+
+    // 计算手指弯曲度（用于更精确的判断）
+    const getFingerCurvature = (tip: any, pip: any) => {
+      return Math.abs(tip.y - pip.y)
+    }
+
+    const indexCurvature = getFingerCurvature(indexTip, indexPIP)
+    const middleCurvature = getFingerCurvature(middleTip, middlePIP)
+    const ringCurvature = getFingerCurvature(ringTip, ringPIP)
+    const pinkyCurvature = getFingerCurvature(pinkyTip, pinkyPIP)
+
+    // 握拳：所有手指都弯曲（更严格的判断）
     if (!indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
-      return 'fist'
+      const avgCurvature = (indexCurvature + middleCurvature + ringCurvature + pinkyCurvature) / 4
+      const confidence = avgCurvature < 0.1 ? 0.9 : 0.7  // 弯曲度越小，置信度越高
+      console.log('[手势识别] 识别为握拳, confidence:', confidence)
+      return { type: 'fist', confidence }
+    }
+
+    // 竖大拇指：只有拇指伸直（优先级提高，放在张开五指之前）
+    if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
+      console.log('[手势识别] 识别为竖大拇指')
+      return { type: 'thumbsUp', confidence: 0.85 }
     }
 
     // 张开五指：所有手指都伸直
     if (indexExtended && middleExtended && ringExtended && pinkyExtended && thumbExtended) {
-      return 'palm'
+      const avgCurvature = (indexCurvature + middleCurvature + ringCurvature + pinkyCurvature) / 4
+      const confidence = avgCurvature > 0.08 ? 0.9 : 0.7  // 伸直度越大，置信度越高
+      console.log('[手势识别] 识别为张开五指, confidence:', confidence)
+      return { type: 'palm', confidence }
     }
 
     // 食指指向：只有食指伸直
     if (indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
-      return 'pointing'
+      const confidence = indexCurvature > 0.08 && middleCurvature < 0.05 ? 0.9 : 0.7
+      console.log('[手势识别] 识别为食指指向, confidence:', confidence)
+      return { type: 'pointing', confidence }
     }
 
-    // 竖大拇指：只有拇指伸直
-    if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
-      return 'thumbsUp'
+    // 双指并拢：食指和中指伸直，无名指和小指弯曲
+    if (indexExtended && middleExtended && !ringExtended && !pinkyExtended) {
+      const confidence = indexCurvature > 0.08 && middleCurvature > 0.08 ? 0.85 : 0.7
+      console.log('[手势识别] 识别为双指并拢, confidence:', confidence)
+      return { type: 'twoFingers', confidence }
     }
 
-    // OK 手势：拇指和食指靠近，其他手指伸直
-    const thumbIndexDistance = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y)
-    if (thumbIndexDistance < 0.05 && middleExtended && ringExtended && pinkyExtended) {
-      return 'ok'
-    }
-
-    // 双指捏合：拇指和食指靠近
-    if (thumbIndexDistance < 0.08) {
-      return 'pinch'
-    }
-
-    return 'none'
+    return { type: 'none', confidence: 0 }
   }
 
   // 检查摄像头权限
@@ -194,12 +218,32 @@ export function useGesture() {
             y: newPosition.y - lastPosition.y
           }
 
-          gestureState.value = {
-            type: detectGestureType(landmarks),
-            position: newPosition,
-            direction,
-            confidence: results.multiHandedness?.[0]?.score || 0,
-            velocity
+          // 检测手势类型和置信度
+          const gestureResult = detectGestureType(landmarks)
+          const handConfidence = results.multiHandedness?.[0]?.score || 0
+
+          // 综合置信度：手部检测置信度 * 手势识别置信度
+          const finalConfidence = handConfidence * gestureResult.confidence
+
+          // 只有置信度足够高才更新手势状态
+          if (finalConfidence > 0.5) {
+            gestureState.value = {
+              type: gestureResult.type,
+              position: newPosition,
+              direction,
+              confidence: finalConfidence,
+              velocity
+            }
+          } else {
+            // 置信度不足，保持位置但标记为无手势
+            gestureState.value = {
+              ...gestureState.value,
+              position: newPosition,
+              direction,
+              velocity,
+              type: 'none',
+              confidence: finalConfidence
+            }
           }
 
           lastPosition = newPosition
