@@ -75,6 +75,27 @@ const CONFIG = {
   vermilion: '#C41E3A',
 }
 
+// 背景图片
+const bgImage = ref<HTMLImageElement | null>(null)
+const swordImage = ref<HTMLImageElement | null>(null)
+
+// 加载图片
+const loadImages = () => {
+  // 加载背景图
+  const bg = new Image()
+  bg.src = '/images/bg-mountain.jpg'
+  bg.onload = () => {
+    bgImage.value = bg
+  }
+  
+  // 加载剑图片
+  const sw = new Image()
+  sw.src = '/images/sword.jpg'
+  sw.onload = () => {
+    swordImage.value = sw
+  }
+}
+
 // 更新 Canvas 尺寸
 const updateCanvasSize = () => {
   if (!containerRef.value || !canvasRef.value) return
@@ -131,10 +152,26 @@ const handleMiddleClick = (event: MouseEvent) => {
   }
 }
 
-// 绘制水墨背景
+// 绘制视差背景
 const drawBackground = (ctx: CanvasRenderingContext2D) => {
   ctx.fillStyle = CONFIG.paperColor
   ctx.fillRect(0, 0, canvasWidth.value, canvasHeight.value)
+  
+  // 绘制背景图片（视差效果）
+  if (bgImage.value) {
+    const parallaxX = (sword.value.position.x / canvasWidth.value - 0.5) * 50
+    const parallaxY = (sword.value.position.y / canvasHeight.value - 0.5) * 30
+    
+    const scale = 1.1
+    const imgW = canvasWidth.value * scale
+    const imgH = canvasHeight.value * scale
+    const imgX = (canvasWidth.value - imgW) / 2 - parallaxX
+    const imgY = (canvasHeight.value - imgH) / 2 - parallaxY
+    
+    ctx.globalAlpha = 0.3
+    ctx.drawImage(bgImage.value, imgX, imgY, imgW, imgH)
+    ctx.globalAlpha = 1
+  }
   
   ctx.globalAlpha = 0.03
   for (let i = 0; i < 50; i++) {
@@ -283,47 +320,26 @@ const drawSword = (ctx: CanvasRenderingContext2D) => {
     ctx.shadowBlur = 10 + s.chargeLevel * 20
   }
   
-  // 剑身渐变
-  const gradient = ctx.createLinearGradient(-CONFIG.swordWidth / 2, 0, CONFIG.swordWidth / 2, 0)
-  gradient.addColorStop(0, CONFIG.inkColor)
-  gradient.addColorStop(0.3, CONFIG.inkLightColor)
-  gradient.addColorStop(0.5, '#9A9A9A')
-  gradient.addColorStop(0.7, CONFIG.inkLightColor)
-  gradient.addColorStop(1, CONFIG.inkColor)
-  
-  // 绘制剑身
-  ctx.beginPath()
-  ctx.moveTo(0, -CONFIG.swordLength / 2)
-  ctx.lineTo(CONFIG.swordWidth / 2, CONFIG.swordLength / 4)
-  ctx.lineTo(CONFIG.swordWidth / 3, CONFIG.swordLength / 2)
-  ctx.lineTo(-CONFIG.swordWidth / 3, CONFIG.swordLength / 2)
-  ctx.lineTo(-CONFIG.swordWidth / 2, CONFIG.swordLength / 4)
-  ctx.closePath()
-  
-  ctx.fillStyle = gradient
-  ctx.fill()
-  ctx.strokeStyle = CONFIG.inkColor
-  ctx.lineWidth = 1
-  ctx.stroke()
-  
-  // 剑光
-  ctx.beginPath()
-  ctx.moveTo(0, -CONFIG.swordLength / 2 + 5)
-  ctx.lineTo(1, CONFIG.swordLength / 4)
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'
-  ctx.lineWidth = 2
-  ctx.stroke()
-  
-  // 剑格
-  ctx.shadowBlur = 0
-  ctx.beginPath()
-  ctx.ellipse(0, CONFIG.swordLength / 2, CONFIG.swordWidth * 1.2, 3, 0, 0, Math.PI * 2)
-  ctx.fillStyle = CONFIG.vermilion
-  ctx.fill()
-  
-  // 剑柄
-  ctx.fillStyle = '#8B6914'
-  ctx.fillRect(-CONFIG.swordWidth / 4, CONFIG.swordLength / 2, CONFIG.swordWidth / 2, 15)
+  // 使用图片绘制剑
+  if (swordImage.value) {
+    const imgSize = 80
+    ctx.drawImage(swordImage.value, -imgSize / 2, -imgSize / 2, imgSize, imgSize)
+  } else {
+    // 备用：绘制简单剑形
+    const gradient = ctx.createLinearGradient(-CONFIG.swordWidth / 2, 0, CONFIG.swordWidth / 2, 0)
+    gradient.addColorStop(0, CONFIG.inkColor)
+    gradient.addColorStop(0.5, '#9A9A9A')
+    gradient.addColorStop(1, CONFIG.inkColor)
+    
+    ctx.beginPath()
+    ctx.moveTo(0, -CONFIG.swordLength / 2)
+    ctx.lineTo(CONFIG.swordWidth / 2, CONFIG.swordLength / 4)
+    ctx.lineTo(0, CONFIG.swordLength / 2)
+    ctx.lineTo(-CONFIG.swordWidth / 2, CONFIG.swordLength / 4)
+    ctx.closePath()
+    ctx.fillStyle = gradient
+    ctx.fill()
+  }
   
   ctx.restore()
 }
@@ -468,6 +484,7 @@ const drawComboIndicator = (ctx: CanvasRenderingContext2D) => {
 }
 
 onMounted(() => {
+  loadImages()
   updateCanvasSize()
   window.addEventListener('resize', updateCanvasSize)
   animationFrameId = requestAnimationFrame(render)
