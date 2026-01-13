@@ -15,11 +15,14 @@ export type GestureState = {
   velocity: { x: number; y: number }
 }
 
+export type CameraPermissionStatus = 'unknown' | 'checking' | 'granted' | 'denied' | 'prompt'
+
 export function useGesture() {
   const isInitialized = ref(false)
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const hasCamera = ref(false)
+  const permissionStatus = ref<CameraPermissionStatus>('unknown')
   
   const gestureState = ref<GestureState>({
     type: 'none',
@@ -94,6 +97,39 @@ export function useGesture() {
     return 'none'
   }
 
+  // 检查摄像头权限
+  const checkPermission = async (): Promise<CameraPermissionStatus> => {
+    permissionStatus.value = 'checking'
+    
+    try {
+      // 检查浏览器是否支持
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        permissionStatus.value = 'denied'
+        error.value = '您的浏览器不支持摄像头功能'
+        return 'denied'
+      }
+
+      // 检查权限 API
+      if (navigator.permissions) {
+        try {
+          const result = await navigator.permissions.query({ name: 'camera' as PermissionName })
+          permissionStatus.value = result.state as CameraPermissionStatus
+          return result.state as CameraPermissionStatus
+        } catch {
+          // 某些浏览器不支持 camera 权限查询
+          permissionStatus.value = 'prompt'
+          return 'prompt'
+        }
+      }
+
+      permissionStatus.value = 'prompt'
+      return 'prompt'
+    } catch {
+      permissionStatus.value = 'unknown'
+      return 'unknown'
+    }
+  }
+
   const initialize = async (video: HTMLVideoElement): Promise<boolean> => {
     if (isInitialized.value) return true
     
@@ -102,6 +138,14 @@ export function useGesture() {
     videoElement = video
 
     try {
+      // 先检查权限
+      const status = await checkPermission()
+      if (status === 'denied') {
+        error.value = '摄像头权限被拒绝，请在浏览器设置中允许访问摄像头'
+        isLoading.value = false
+        return false
+      }
+
       // 动态导入 MediaPipe
       const { Hands } = await import('@mediapipe/hands')
       const { Camera } = await import('@mediapipe/camera_utils')
@@ -165,6 +209,7 @@ export function useGesture() {
         video: { facingMode: 'user', width: 640, height: 480 }
       })
       
+      permissionStatus.value = 'granted'
       video.srcObject = stream
       await video.play()
       hasCamera.value = true
@@ -183,7 +228,21 @@ export function useGesture() {
       return true
 
     } catch (e: any) {
-      error.value = e.message || '初始化手势识别失败'
+      // 处理不同的错误类型
+      if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+        permissionStatus.value = 'denied'
+        error.value = '摄像头权限被拒绝，请点击浏览器地址栏左侧的锁图标，允许访问摄像头'
+      } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+        error.value = '未检测到摄像头设备，请确保您的设备有摄像头'
+      } else if (e.name === 'NotReadableError' || e.name === 'TrackStartError') {
+        error.value = '摄像头被其他程序占用，请关闭其他使用摄像头的应用后重试'
+      } else if (e.name === 'OverconstrainedError') {
+        error.value = '摄像头不支持所需的分辨率'
+      } else if (e.name === 'TypeError') {
+        error.value = '请使用 HTTPS 或 localhost 访问以使用摄像头功能'
+      } else {
+        error.value = e.message || '初始化手势识别失败，请刷新页面重试'
+      }
       isLoading.value = false
       return false
     }
@@ -211,7 +270,9 @@ export function useGesture() {
     isLoading: readonly(isLoading),
     error: readonly(error),
     hasCamera: readonly(hasCamera),
+    permissionStatus: readonly(permissionStatus),
     gestureState: readonly(gestureState),
+    checkPermission,
     initialize,
     stop
   }

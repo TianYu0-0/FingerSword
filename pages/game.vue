@@ -13,8 +13,10 @@ const gameCanvasRef = ref<InstanceType<typeof GameCanvas> | null>(null)
 const { 
   isInitialized, 
   isLoading, 
-  error, 
+  error,
+  permissionStatus,
   gestureState,
+  checkPermission,
   initialize,
   stop 
 } = useGesture()
@@ -139,16 +141,43 @@ watch(gestureState, (newState) => {
     <Transition name="fade">
       <div v-if="showGesturePanel" class="gesture-panel ink-card">
         <h3 class="panel-title">手势控制</h3>
-        <video ref="videoRef" class="gesture-video" autoplay playsinline muted />
-        <div v-if="isLoading" class="gesture-status">正在初始化摄像头...</div>
-        <div v-else-if="error" class="gesture-status error">{{ error }}</div>
-        <div v-else-if="isInitialized" class="gesture-status success">
-          手势: {{ gestureState.type }}
+        
+        <!-- 权限引导 -->
+        <div v-if="permissionStatus === 'denied'" class="permission-guide">
+          <div class="permission-icon">🚫</div>
+          <p class="permission-title">摄像头权限被拒绝</p>
+          <p class="permission-desc">请按以下步骤开启：</p>
+          <ol class="permission-steps">
+            <li>点击浏览器地址栏左侧的 🔒 图标</li>
+            <li>找到"摄像头"选项</li>
+            <li>选择"允许"</li>
+            <li>刷新页面重试</li>
+          </ol>
         </div>
+        
+        <!-- 摄像头预览 -->
+        <div v-else class="camera-preview">
+          <video ref="videoRef" class="gesture-video" autoplay playsinline muted />
+          <div v-if="isLoading" class="gesture-status loading">
+            <span class="loading-spinner"></span>
+            正在初始化摄像头...
+          </div>
+          <div v-else-if="error" class="gesture-status error">
+            <span class="error-icon">⚠️</span>
+            {{ error }}
+          </div>
+          <div v-else-if="isInitialized" class="gesture-status success">
+            <span class="success-icon">✓</span>
+            识别中: {{ gestureState.type === 'none' ? '等待手势' : gestureState.type }}
+          </div>
+        </div>
+        
         <div class="gesture-tips">
           <p>👆 食指指向 - 控制剑位置</p>
-          <p>✊ 握拳 - 蓄力</p>
-          <p>🖐️ 张开手掌 - 释放</p>
+          <p>✊ 握拳 - 聚剑蓄力</p>
+          <p>🖐️ 张开手掌 - 剑气冲击波</p>
+          <p>👌 OK手势 - 瞬移突刺</p>
+          <p>👍 竖大拇指 - 剑气护盾</p>
         </div>
         <button class="close-btn" @click="closeGesturePanel">关闭</button>
       </div>
@@ -396,6 +425,70 @@ watch(gestureState, (newState) => {
 
 .gesture-tips p {
   margin: 0.25rem 0;
+}
+
+/* 权限引导样式 */
+.permission-guide {
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.permission-icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.permission-title {
+  font-size: 1rem;
+  font-weight: bold;
+  color: #C41E3A;
+  margin-bottom: 0.5rem;
+}
+
+.permission-desc {
+  font-size: 0.875rem;
+  color: #6B6B6B;
+  margin-bottom: 0.5rem;
+}
+
+.permission-steps {
+  text-align: left;
+  font-size: 0.75rem;
+  color: #6B6B6B;
+  padding-left: 1.5rem;
+  margin: 0;
+}
+
+.permission-steps li {
+  margin: 0.25rem 0;
+}
+
+.camera-preview {
+  position: relative;
+}
+
+.gesture-status.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.loading-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(107, 107, 107, 0.3);
+  border-top-color: #6B6B6B;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-icon, .success-icon {
+  margin-right: 0.25rem;
 }
 
 .fade-enter-active, .fade-leave-active {
