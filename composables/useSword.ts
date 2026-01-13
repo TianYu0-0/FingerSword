@@ -234,7 +234,11 @@ export function useSword() {
 
   // 瞬移突刺
   const thrust = (targetX: number, targetY: number) => {
-    if (attackState.value.isAttacking) return
+    console.log('[useSword] thrust:', targetX, targetY, 'isAttacking:', attackState.value.isAttacking)
+    if (attackState.value.isAttacking) {
+      console.log('[useSword] thrust 被阻止：正在攻击中')
+      return
+    }
 
     const dx = targetX - sword.value.position.x
     const dy = targetY - sword.value.position.y
@@ -293,6 +297,7 @@ export function useSword() {
 
   // 双击
   const onDoubleClick = (e: MouseEvent) => {
+    console.log('[useSword] onDoubleClick:', e.offsetX, e.offsetY)
     thrust(e.offsetX, e.offsetY)
   }
 
