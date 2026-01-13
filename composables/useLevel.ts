@@ -46,6 +46,50 @@ export type LevelState = {
   startTime: number
 }
 
+const STORAGE_KEY = 'finger-sword-level-status'
+
+// 从 localStorage 读取关卡状态
+const loadLevelStatus = (): Record<LevelId, LevelStatus> => {
+  if (typeof window === 'undefined') {
+    return {
+      tutorial: 'unlocked',
+      slayMonster: 'locked',
+      swordTrail: 'locked',
+      swordRain: 'locked',
+      swordShield: 'locked'
+    }
+  }
+  
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      return JSON.parse(saved)
+    }
+  } catch (e) {
+    console.error('[useLevel] 读取存储失败:', e)
+  }
+  
+  return {
+    tutorial: 'unlocked',
+    slayMonster: 'locked',
+    swordTrail: 'locked',
+    swordRain: 'locked',
+    swordShield: 'locked'
+  }
+}
+
+// 保存关卡状态到 localStorage
+const saveLevelStatus = (status: Record<LevelId, LevelStatus>) => {
+  if (typeof window === 'undefined') return
+  
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(status))
+    console.log('[useLevel] 关卡状态已保存:', status)
+  } catch (e) {
+    console.error('[useLevel] 保存存储失败:', e)
+  }
+}
+
 const levelConfigs: Record<LevelId, LevelConfig> = {
   tutorial: {
     id: 'tutorial',
@@ -110,13 +154,7 @@ export function useLevel() {
     startTime: 0
   })
 
-  const levelStatus = ref<Record<LevelId, LevelStatus>>({
-    tutorial: 'unlocked',
-    slayMonster: 'locked',
-    swordTrail: 'locked',
-    swordRain: 'locked',
-    swordShield: 'locked'
-  })
+  const levelStatus = ref<Record<LevelId, LevelStatus>>(loadLevelStatus())
 
   const currentConfig = computed(() => {
     if (!state.value.currentLevel) return null
@@ -171,6 +209,9 @@ export function useLevel() {
           levelStatus.value[nextLevel] = 'unlocked'
         }
       }
+      
+      // 保存到 localStorage
+      saveLevelStatus(levelStatus.value)
     }
 
     console.log('[useLevel] 关卡结束:', success ? '成功' : '失败', '得分:', state.value.score)
