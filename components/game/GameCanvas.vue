@@ -475,10 +475,18 @@ const drawComboIndicator = (ctx: CanvasRenderingContext2D) => {
   ctx.restore()
 }
 
+// 全局右键松开监听（确保万剑齐发能触发）
+const handleGlobalMouseUp = (event: MouseEvent) => {
+  if (event.button === 2) {
+    onRightMouseUp()
+  }
+}
+
 onMounted(() => {
   loadImages()
   updateCanvasSize()
   window.addEventListener('resize', updateCanvasSize)
+  window.addEventListener('mouseup', handleGlobalMouseUp)
   animationFrameId = requestAnimationFrame(render)
   
   // 绑定触摸事件
@@ -511,6 +519,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateCanvasSize)
+  window.removeEventListener('mouseup', handleGlobalMouseUp)
   if (animationFrameId) cancelAnimationFrame(animationFrameId)
   if (unbindTouch) unbindTouch()
 })
