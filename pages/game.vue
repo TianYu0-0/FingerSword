@@ -92,10 +92,11 @@ onMounted(() => {
       }
     }, 1500)
     
-    // 游戏循环（更新时间）
+    // 游戏循环（更新时间和敌人）
     gameLoopTimer = setInterval(() => {
       if (levelState.value.isPlaying && !levelState.value.isPaused) {
         updateTime(0.1)  // 每100ms更新一次
+        updateEnemies(0.1, window.innerWidth, window.innerHeight)  // 更新敌人位置
         
         // 检查时间是否结束
         if (levelState.value.timeRemaining <= 0) {
@@ -141,6 +142,7 @@ const retryLevel = () => {
     gameLoopTimer = setInterval(() => {
       if (levelState.value.isPlaying && !levelState.value.isPaused) {
         updateTime(0.1)
+        updateEnemies(0.1, window.innerWidth, window.innerHeight)
         if (levelState.value.timeRemaining <= 0) {
           handleLevelEnd()
         }
