@@ -17,6 +17,7 @@ export type Enemy = {
   direction: Vector2D
   isAlive: boolean
   spawnTime: number
+  imageIndex?: number  // 小怪图片索引（0-4）
 }
 
 export type LevelConfig = {
@@ -150,7 +151,12 @@ const levelConfigs: Record<LevelId, LevelConfig> = {
     targetScore: 800,
     enemies: { types: ['target'], spawnInterval: 0, maxCount: 0 },
     trail: {
-      points: generateCircleTrail(400, 300, 150, 60),  // 圆形轨迹
+      points: generateCircleTrail(
+        typeof window !== 'undefined' ? window.innerWidth / 2 : 400,
+        typeof window !== 'undefined' ? window.innerHeight / 2 : 300,
+        150,
+        60
+      ),  // 圆形轨迹，动态居中
       width: 40,
       loop: true
     }
@@ -162,7 +168,7 @@ const levelConfigs: Record<LevelId, LevelConfig> = {
     difficulty: 3,
     duration: 90,
     targetScore: 1000,
-    enemies: { types: ['monster', 'target'], spawnInterval: 2000, maxCount: 8 }
+    enemies: { types: ['monster'], spawnInterval: 2000, maxCount: 8 }
   },
   swordShield: {
     id: 'swordShield',
@@ -171,7 +177,7 @@ const levelConfigs: Record<LevelId, LevelConfig> = {
     difficulty: 4,
     duration: 120,
     targetScore: 1500,
-    enemies: { types: ['projectile'], spawnInterval: 800, maxCount: 10 }
+    enemies: { types: ['monster'], spawnInterval: 800, maxCount: 10 }
   }
 }
 
@@ -306,7 +312,8 @@ export function useLevel() {
       speed: type === 'projectile' ? 300 : 80,
       direction: { x: dirX, y: dirY },
       isAlive: true,
-      spawnTime: Date.now()
+      spawnTime: Date.now(),
+      imageIndex: type === 'monster' ? Math.floor(Math.random() * 5) : undefined  // 随机选择0-4的图片
     }
 
     state.value.enemies.push(enemy)
@@ -398,6 +405,11 @@ export function useLevel() {
     }
   }
 
+  // 增加分数
+  const addScore = (score: number) => {
+    state.value.score += score
+  }
+
   // 获取关卡列表
   const getLevelList = () => {
     return Object.values(levelConfigs).map(config => ({
@@ -420,6 +432,7 @@ export function useLevel() {
     damageEnemy,
     resetCombo,
     updateTime,
+    addScore,
     getLevelList
   }
 }

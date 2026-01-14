@@ -3,11 +3,13 @@ import GameCanvas from '~/components/game/GameCanvas.vue'
 import { useGesture } from '~/composables/useGesture'
 import { useGestureActions } from '~/composables/useGestureActions'
 import { useTutorial } from '~/composables/useTutorial'
+import { useLevel } from '~/composables/useLevel'
 
 const showHelp = ref(false)
 const showModeSelector = ref(false)
 const controlMode = ref<'mouse' | 'gesture'>('gesture')  // 默认手势模式
 const showGesturePanel = ref(false)
+const isGesturePanelMinimized = ref(false)  // 手势面板是否最小化
 const videoRef = ref<HTMLVideoElement | null>(null)
 const gameCanvasRef = ref<InstanceType<typeof GameCanvas> | null>(null)
 const containerRef = ref<HTMLDivElement | null>(null)
@@ -43,6 +45,8 @@ const {
   generateTarget,
   skipTutorial
 } = useTutorial()
+
+const { endLevel, startLevel: startLevelTracking } = useLevel()
 
 const showSuccessMessage = ref(false)
 const successMessage = ref('')
@@ -174,6 +178,11 @@ const closeGesturePanel = () => {
   }
 }
 
+// 切换手势面板最小化
+const toggleGesturePanelMinimize = () => {
+  isGesturePanelMinimized.value = !isGesturePanelMinimized.value
+}
+
 // 手势状态变化时处理动作
 watch(gestureState, (newState) => {
   if (controlMode.value === 'gesture' && isInitialized.value) {
@@ -209,12 +218,15 @@ watch(() => tutorialState.value.currentStep, (newStep, oldStep) => {
 
 const handleStart = () => {
   startTutorial(controlMode.value)
+  startLevelTracking('tutorial')  // 开始关卡追踪
   if (currentStepData.value?.requiredAction === 'move') {
     generateTarget(window.innerWidth, window.innerHeight)
   }
 }
 
 const handleComplete = () => {
+  // 标记教学关卡完成
+  endLevel(true)
   navigateTo('/levels')
 }
 
@@ -337,8 +349,11 @@ onUnmounted(() => {
 
     <!-- 手势控制面板 -->
     <Transition name="fade">
-      <div v-if="showGesturePanel" class="gesture-panel ink-card">
-        <h3 class="panel-title">手势控制</h3>
+      <div v-show="showGesturePanel && !isGesturePanelMinimized" class="gesture-panel ink-card">
+        <div class="panel-header">
+          <h3 class="panel-title">手势控制</h3>
+          <button class="minimize-btn" @click="toggleGesturePanelMinimize" title="最小化">−</button>
+        </div>
 
         <!-- 权限引导 -->
         <div v-if="permissionStatus === 'denied'" class="permission-guide">
@@ -397,6 +412,19 @@ onUnmounted(() => {
         </div>
         <button class="close-btn" @click="closeGesturePanel">关闭</button>
       </div>
+    </Transition>
+
+    <!-- 最小化的手势面板按钮 -->
+    <Transition name="fade">
+      <button
+        v-if="showGesturePanel && isGesturePanelMinimized"
+        class="gesture-panel-minimized ink-card"
+        @click="toggleGesturePanelMinimize"
+        title="展开手势控制面板"
+      >
+        <span class="gesture-icon">👋</span>
+        <span class="gesture-label">手势</span>
+      </button>
     </Transition>
 
     <!-- 帮助面板 -->
@@ -714,11 +742,65 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
 .panel-title {
   font-family: 'ZCOOL XiaoWei', serif;
   font-size: 1.125rem;
   color: #1A1A1A;
-  margin-bottom: 0.75rem;
+  margin: 0;
+}
+
+.minimize-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6B6B6B;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  line-height: 1;
+  transition: all 0.2s;
+}
+
+.minimize-btn:hover {
+  color: #1A1A1A;
+  background: rgba(107, 107, 107, 0.1);
+  border-radius: 4px;
+}
+
+.gesture-panel-minimized {
+  position: absolute;
+  top: 5rem;
+  left: 1rem;
+  z-index: 20;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.gesture-panel-minimized:hover {
+  background-color: rgba(107, 107, 107, 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(26, 26, 26, 0.1);
+}
+
+.gesture-icon {
+  font-size: 1.25rem;
+}
+
+.gesture-label {
+  font-family: 'ZCOOL XiaoWei', serif;
+  font-size: 0.875rem;
+  color: #1A1A1A;
 }
 
 .gesture-video {

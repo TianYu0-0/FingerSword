@@ -4,11 +4,14 @@ import { useGesture } from '~/composables/useGesture'
 import { useGestureActions } from '~/composables/useGestureActions'
 import { useTutorial } from '~/composables/useTutorial'
 import { useLevel } from '~/composables/useLevel'
+import { useLevelEnemies } from '~/composables/useLevelEnemies'
 
 const route = useRoute()
 const levelId = computed(() => route.query.level as string || null)
 const isTutorialMode = computed(() => levelId.value === 'tutorial')
 const isLevelMode = computed(() => levelId.value && levelId.value !== 'tutorial')
+const isSlayMonsterMode = computed(() => levelId.value === 'slayMonster')
+const isSwordTrailMode = computed(() => levelId.value === 'swordTrail')
 
 const showHelp = ref(false)
 const showModeSelector = ref(false)
@@ -52,18 +55,33 @@ const {
 } = useTutorial()
 
 // 关卡系统
-const { 
+const {
   state: levelState,
   currentConfig: levelConfig,
-  levelStatus, 
-  startLevel, 
+  levelStatus,
+  startLevel,
   endLevel,
   spawnEnemy,
   updateEnemies,
   checkHit,
   damageEnemy,
-  updateTime
+  updateTime,
+  addScore
 } = useLevel()
+
+// 敌人管理（封装的通用逻辑）
+const {
+  handleEnemyHit,
+  startEnemySpawn,
+  stopEnemySpawn
+} = useLevelEnemies(
+  levelState,
+  levelConfig,
+  damageEnemy,
+  spawnEnemy,
+  updateEnemies,
+  updateTime
+)
 
 // 关卡结束状态
 const showLevelResult = ref(false)
@@ -71,10 +89,6 @@ const levelResult = ref<{ score: number; kills: number; maxCombo: number; succes
 
 // 关卡引导
 const showLevelGuide = ref(false)
-
-// 敌人生成定时器
-let spawnTimer: ReturnType<typeof setInterval> | null = null
-let gameLoopTimer: ReturnType<typeof setInterval> | null = null
 
 // 教程模式初始化
 onMounted(() => {
@@ -115,16 +129,15 @@ const handleLevelEnd = () => {
   const result = endLevel(levelState.value.score >= (levelConfig.value?.targetScore || 0))
   levelResult.value = result
   showLevelResult.value = true
-  
+
   // 清理定时器
-  if (spawnTimer) clearInterval(spawnTimer)
-  if (gameLoopTimer) clearInterval(gameLoopTimer)
+  stopEnemySpawn()
 }
 
-// 敌人被击中处理
-const handleEnemyHit = (enemyId: string) => {
-  if (isSlayMonsterMode.value) {
-    damageEnemy(enemyId, 100)  // 一击必杀
+// 轨迹得分处理
+const handleTrailScore = (score: number) => {
+  if (levelId.value === 'swordTrail' && levelState.value.isPlaying) {
+    addScore(score)
   }
 }
 
@@ -135,41 +148,12 @@ const retryLevel = () => {
 
   if (levelId.value) {
     startLevel(levelId.value as any)
-
-    // 御剑斩妖模式需要敌人生成
-    if (levelId.value === 'slayMonster') {
-      spawnTimer = setInterval(() => {
-        if (levelState.value.isPlaying && !levelState.value.isPaused) {
-          spawnEnemy(window.innerWidth, window.innerHeight)
-        }
-      }, 1500)
-
-      gameLoopTimer = setInterval(() => {
-        if (levelState.value.isPlaying && !levelState.value.isPaused) {
-          updateTime(0.1)
-          updateEnemies(0.1, window.innerWidth, window.innerHeight)
-          if (levelState.value.timeRemaining <= 0) {
-            handleLevelEnd()
-          }
-        }
-      }, 100)
-    } else {
-      // 其他关卡只需要时间更新
-      gameLoopTimer = setInterval(() => {
-        if (levelState.value.isPlaying && !levelState.value.isPaused) {
-          updateTime(0.1)
-          if (levelState.value.timeRemaining <= 0) {
-            handleLevelEnd()
-          }
-        }
-      }, 100)
-    }
+    startEnemySpawn(window.innerWidth, window.innerHeight, handleLevelEnd)
   }
 }
 
 onUnmounted(() => {
-  if (spawnTimer) clearInterval(spawnTimer)
-  if (gameLoopTimer) clearInterval(gameLoopTimer)
+  stopEnemySpawn()
 })
 
 // 监听教程完成，解锁下一关
@@ -368,34 +352,7 @@ const startLevelGame = () => {
   levelState.value.isPaused = false
 
   if (levelId.value) {
-    // 御剑斩妖模式需要敌人生成
-    if (levelId.value === 'slayMonster') {
-      spawnTimer = setInterval(() => {
-        if (levelState.value.isPlaying && !levelState.value.isPaused) {
-          spawnEnemy(window.innerWidth, window.innerHeight)
-        }
-      }, 1500)
-
-      gameLoopTimer = setInterval(() => {
-        if (levelState.value.isPlaying && !levelState.value.isPaused) {
-          updateTime(0.1)
-          updateEnemies(0.1, window.innerWidth, window.innerHeight)
-          if (levelState.value.timeRemaining <= 0) {
-            handleLevelEnd()
-          }
-        }
-      }, 100)
-    } else {
-      // 其他关卡只需要时间更新
-      gameLoopTimer = setInterval(() => {
-        if (levelState.value.isPlaying && !levelState.value.isPaused) {
-          updateTime(0.1)
-          if (levelState.value.timeRemaining <= 0) {
-            handleLevelEnd()
-          }
-        }
-      }, 100)
-    }
+    startEnemySpawn(window.innerWidth, window.innerHeight, handleLevelEnd)
   }
 }
 
@@ -434,6 +391,7 @@ watch(gestureState, (newState) => {
       @sword-charge="(data: { chargeLevel: number }) => handleTutorialAction('charge', data)"
       @sword-thrust="() => handleTutorialAction('thrust')"
       @enemy-hit="handleEnemyHit"
+      @trail-score="handleTrailScore"
     />
     
     <!-- 教程引导面板 -->
@@ -484,7 +442,51 @@ watch(gestureState, (newState) => {
         <span class="hud-value combo-text">{{ levelState.combo }}连击!</span>
       </div>
     </div>
-    
+
+    <!-- 剑阵修炼关卡UI -->
+    <div v-if="isSwordTrailMode && levelState.isPlaying" class="level-hud">
+      <div class="hud-item time">
+        <span class="hud-label">⏱️</span>
+        <span class="hud-value">{{ Math.ceil(levelState.timeRemaining) }}s</span>
+      </div>
+      <div class="hud-item score">
+        <span class="hud-label">🎯</span>
+        <span class="hud-value">{{ levelState.score }}</span>
+      </div>
+      <div class="hud-item target">
+        <span class="hud-label">目标</span>
+        <span class="hud-value">{{ levelConfig?.targetScore }}</span>
+      </div>
+      <div class="hud-item progress">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" :style="{ width: `${Math.min(100, (levelState.score / (levelConfig?.targetScore || 1)) * 100)}%` }"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 万剑归宗和万剑护体关卡UI -->
+    <div v-if="(levelId === 'swordRain' || levelId === 'swordShield') && levelState.isPlaying" class="level-hud">
+      <div class="hud-item time">
+        <span class="hud-label">⏱️</span>
+        <span class="hud-value">{{ Math.ceil(levelState.timeRemaining) }}s</span>
+      </div>
+      <div class="hud-item score">
+        <span class="hud-label">🎯</span>
+        <span class="hud-value">{{ levelState.score }}</span>
+      </div>
+      <div class="hud-item target">
+        <span class="hud-label">目标</span>
+        <span class="hud-value">{{ levelConfig?.targetScore }}</span>
+      </div>
+      <div class="hud-item kills">
+        <span class="hud-label">💀</span>
+        <span class="hud-value">{{ levelState.kills }}</span>
+      </div>
+      <div class="hud-item combo" v-if="levelState.combo > 1">
+        <span class="hud-value combo-text">{{ levelState.combo }}连击!</span>
+      </div>
+    </div>
+
     <!-- 关卡结算面板 -->
     <div v-if="showLevelResult" class="level-result-overlay">
       <div class="result-panel ink-card">
@@ -1410,6 +1412,28 @@ watch(gestureState, (newState) => {
 @keyframes pulse {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.1); }
+}
+
+/* 进度条样式 */
+.hud-item.progress {
+  flex: 1;
+  min-width: 150px;
+  padding: 8px 12px;
+}
+
+.progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: rgba(107, 107, 107, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #C41E3A, #FFD700);
+  border-radius: 4px;
+  transition: width 0.3s ease;
 }
 
 /* 关卡结算面板 */

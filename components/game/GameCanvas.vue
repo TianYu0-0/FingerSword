@@ -29,6 +29,7 @@ const emit = defineEmits<{
   'sword-charge': [data: { chargeLevel: number }]
   'sword-thrust': []
   'enemy-hit': [enemyId: string]
+  'trail-score': [score: number]
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -86,6 +87,39 @@ const canvasHeight = ref(600)
 let animationFrameId: number | null = null
 let lastTime = 0
 
+// 已击中的敌人集合（防止重复击中）
+const hitEnemiesSet = ref<Set<string>>(new Set())
+
+// 小怪图片缓存
+const monsterImages = ref<HTMLImageElement[]>([])
+const monsterImagesLoaded = ref(false)
+
+// 加载小怪图片
+const loadMonsterImages = () => {
+  const imageCount = 5
+  let loadedCount = 0
+
+  for (let i = 1; i <= imageCount; i++) {
+    const img = new Image()
+    img.src = `/images/monsters/monster${i}.png`
+    img.onload = () => {
+      loadedCount++
+      if (loadedCount === imageCount) {
+        monsterImagesLoaded.value = true
+        console.log('[GameCanvas] 小怪图片加载完成')
+      }
+    }
+    img.onerror = () => {
+      console.warn(`[GameCanvas] 小怪图片 ${i} 加载失败`)
+      loadedCount++
+      if (loadedCount === imageCount) {
+        monsterImagesLoaded.value = true
+      }
+    }
+    monsterImages.value.push(img)
+  }
+}
+
 // 配置
 const CONFIG = {
   inkColor: '#1A1A1A',
@@ -108,13 +142,16 @@ const loadImages = () => {
   bg.onload = () => {
     bgImage.value = bg
   }
-  
+
   // 加载剑图片
   const sw = new Image()
   sw.src = '/images/sword.png'
   sw.onload = () => {
     swordImage.value = sw
   }
+
+  // 加载小怪图片
+  loadMonsterImages()
 }
 
 // 更新 Canvas 尺寸
@@ -479,52 +516,59 @@ const render = (timestamp: number) => {
 // 绘制敌人
 const drawEnemies = (ctx: CanvasRenderingContext2D) => {
   if (!props.levelMode || !props.enemies) return
-  
+
   props.enemies.forEach(enemy => {
     if (!enemy.isAlive) return
-    
+
     const { x, y } = enemy.position
     const size = enemy.size
-    
+
     ctx.save()
-    
+
     if (enemy.type === 'monster') {
-      // 妖怪：红色圆形 + 眼睛
-      const gradient = ctx.createRadialGradient(x, y, 0, x, y, size)
-      gradient.addColorStop(0, '#8B0000')
-      gradient.addColorStop(0.7, '#C41E3A')
-      gradient.addColorStop(1, '#4A0000')
-      
-      ctx.beginPath()
-      ctx.arc(x, y, size / 2, 0, Math.PI * 2)
-      ctx.fillStyle = gradient
-      ctx.fill()
-      
-      // 眼睛
-      ctx.fillStyle = '#FFD700'
-      ctx.beginPath()
-      ctx.arc(x - size * 0.15, y - size * 0.1, size * 0.1, 0, Math.PI * 2)
-      ctx.arc(x + size * 0.15, y - size * 0.1, size * 0.1, 0, Math.PI * 2)
-      ctx.fill()
-      
-      // 嘴巴
-      ctx.strokeStyle = '#FFD700'
-      ctx.lineWidth = 2
-      ctx.beginPath()
-      ctx.arc(x, y + size * 0.1, size * 0.2, 0, Math.PI)
-      ctx.stroke()
+      // 妖怪：使用AI生成的图片
+      if (monsterImagesLoaded.value && enemy.imageIndex !== undefined && monsterImages.value[enemy.imageIndex]) {
+        const img = monsterImages.value[enemy.imageIndex]
+        // 绘制图片，居中显示
+        ctx.drawImage(img, x - size / 2, y - size / 2, size, size)
+      } else {
+        // 图片未加载时的后备方案：红色圆形 + 眼睛
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size)
+        gradient.addColorStop(0, '#8B0000')
+        gradient.addColorStop(0.7, '#C41E3A')
+        gradient.addColorStop(1, '#4A0000')
+
+        ctx.beginPath()
+        ctx.arc(x, y, size / 2, 0, Math.PI * 2)
+        ctx.fillStyle = gradient
+        ctx.fill()
+
+        // 眼睛
+        ctx.fillStyle = '#FFD700'
+        ctx.beginPath()
+        ctx.arc(x - size * 0.15, y - size * 0.1, size * 0.1, 0, Math.PI * 2)
+        ctx.arc(x + size * 0.15, y - size * 0.1, size * 0.1, 0, Math.PI * 2)
+        ctx.fill()
+
+        // 嘴巴
+        ctx.strokeStyle = '#FFD700'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.arc(x, y + size * 0.1, size * 0.2, 0, Math.PI)
+        ctx.stroke()
+      }
     } else {
       // 靶子：同心圆
       ctx.beginPath()
       ctx.arc(x, y, size / 2, 0, Math.PI * 2)
       ctx.fillStyle = '#8B4513'
       ctx.fill()
-      
+
       ctx.beginPath()
       ctx.arc(x, y, size / 3, 0, Math.PI * 2)
       ctx.fillStyle = '#C41E3A'
       ctx.fill()
-      
+
       ctx.beginPath()
       ctx.arc(x, y, size / 6, 0, Math.PI * 2)
       ctx.fillStyle = '#FFD700'
@@ -539,7 +583,12 @@ const drawEnemies = (ctx: CanvasRenderingContext2D) => {
 const checkEnemyCollision = () => {
   if (!props.levelMode || !props.enemies) return
 
-  const hitEnemies = new Set<string>() // 防止同一帧多次命中同一敌人
+  // 清理已死亡敌人的记录
+  props.enemies.forEach(enemy => {
+    if (!enemy.isAlive && hitEnemiesSet.value.has(enemy.id)) {
+      hitEnemiesSet.value.delete(enemy.id)
+    }
+  })
 
   // 1. 检测主剑的基础碰撞（普通移动时）
   if (!attackState.value.isAttacking) {
@@ -547,14 +596,14 @@ const checkEnemyCollision = () => {
     const swordSize = 40  // 剑的碰撞半径
 
     props.enemies.forEach(enemy => {
-      if (!enemy.isAlive || hitEnemies.has(enemy.id)) return
+      if (!enemy.isAlive || hitEnemiesSet.value.has(enemy.id)) return
 
       const dx = enemy.position.x - swordPos.x
       const dy = enemy.position.y - swordPos.y
       const distance = Math.sqrt(dx * dx + dy * dy)
 
       if (distance < (enemy.size + swordSize) / 2) {
-        hitEnemies.add(enemy.id)
+        hitEnemiesSet.value.add(enemy.id)
         emit('enemy-hit', enemy.id)
         emitInkSplash(enemy.position.x, enemy.position.y, 15)
         playSound('slash')
@@ -562,10 +611,36 @@ const checkEnemyCollision = () => {
     })
   }
 
+  // 1.5. 检测聚剑环绕小剑的碰撞
+  if (gatherState.value.isGathering && gatherState.value.swords.length > 0) {
+    gatherState.value.swords.forEach(gatheredSword => {
+      props.enemies.forEach(enemy => {
+        if (!enemy.isAlive || hitEnemiesSet.value.has(enemy.id)) return
+
+        const dx = enemy.position.x - gatheredSword.x
+        const dy = enemy.position.y - gatheredSword.y
+        const distance = Math.sqrt(dx * dx + dy * dy)
+
+        const swordSize = 30  // 环绕小剑的碰撞半径
+        if (distance < (enemy.size + swordSize) / 2) {
+          console.log('[聚剑环绕] 小剑击中敌人!', {
+            enemyId: enemy.id,
+            swordPos: { x: gatheredSword.x.toFixed(0), y: gatheredSword.y.toFixed(0) },
+            enemyPos: { x: enemy.position.x.toFixed(0), y: enemy.position.y.toFixed(0) }
+          })
+          hitEnemiesSet.value.add(enemy.id)
+          emit('enemy-hit', enemy.id)
+          emitInkSplash(enemy.position.x, enemy.position.y, 15)
+          playSound('slash')
+        }
+      })
+    })
+  }
+
   // 2. 检测特效的碰撞（技能攻击）
   effects.value.forEach(effect => {
     props.enemies.forEach(enemy => {
-      if (!enemy.isAlive || hitEnemies.has(enemy.id)) return
+      if (!enemy.isAlive || hitEnemiesSet.value.has(enemy.id)) return
 
       let isHit = false
 
@@ -612,13 +687,21 @@ const checkEnemyCollision = () => {
         const dy = enemy.position.y - swordY
         const dist = Math.sqrt(dx * dx + dy * dy)
 
-        if (dist < 30 + enemy.size / 2) {  // 小剑的碰撞半径
+        const collisionRadius = 30 + enemy.size / 2
+        if (dist < collisionRadius) {
+          console.log('[万剑齐发] 击中敌人!', {
+            enemyId: enemy.id,
+            distance: dist.toFixed(2),
+            collisionRadius: collisionRadius.toFixed(2),
+            swordPos: { x: swordX.toFixed(0), y: swordY.toFixed(0) },
+            enemyPos: { x: enemy.position.x.toFixed(0), y: enemy.position.y.toFixed(0) }
+          })
           isHit = true
         }
       }
 
       if (isHit) {
-        hitEnemies.add(enemy.id)
+        hitEnemiesSet.value.add(enemy.id)
         emit('enemy-hit', enemy.id)
         emitInkSplash(enemy.position.x, enemy.position.y, 15)
         playSound('slash')
@@ -667,7 +750,13 @@ const checkTrailFollow = () => {
     trailFollowState.value.totalDistance += 1
     trailFollowState.value.accuracy = Math.min(100, (1 - minDistance / (width / 2)) * 100)
 
-    // 触发得分事件（可以在这里添加）
+    // 触发得分事件
+    const baseScore = 1
+    const accuracyBonus = Math.floor(trailFollowState.value.accuracy / 20)  // 精准度奖励
+    const score = baseScore + accuracyBonus
+    emit('trail-score', score)
+
+    // 视觉反馈
     if (trailFollowState.value.totalDistance % 10 === 0) {
       emitInkSplash(swordPos.x, swordPos.y, 8)
     }

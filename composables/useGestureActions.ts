@@ -71,6 +71,9 @@ export function useGestureActions() {
   // 手势稳定性要求（需要连续识别多少帧才认为稳定）
   const STABLE_THRESHOLD = 2  // 降低到2帧，更容易触发
 
+  // 手势位置灵敏度（大于1表示手指移动一点，剑移动更多）
+  const POSITION_SENSITIVITY = 1.5
+
   const actionCallbacks = ref<{
     onMove?: (x: number, y: number) => void
     onSlash?: () => void
@@ -119,9 +122,19 @@ export function useGestureActions() {
       currentGesture
     })
 
-    // 位置映射到画布坐标
-    const x = gesture.position.x * canvasWidth
-    const y = gesture.position.y * canvasHeight
+    // 位置映射到画布坐标（应用灵敏度）
+    // 从中心点（0.5, 0.5）计算偏移，然后应用灵敏度系数
+    const centerX = 0.5
+    const centerY = 0.5
+    const offsetX = (gesture.position.x - centerX) * POSITION_SENSITIVITY
+    const offsetY = (gesture.position.y - centerY) * POSITION_SENSITIVITY
+
+    // 限制在有效范围内（0-1）
+    const normalizedX = Math.max(0, Math.min(1, centerX + offsetX))
+    const normalizedY = Math.max(0, Math.min(1, centerY + offsetY))
+
+    const x = normalizedX * canvasWidth
+    const y = normalizedY * canvasHeight
 
     // 1. 始终处理移动（食指指向、张开手掌或双指并拢）
     if (currentGesture === 'pointing' || currentGesture === 'palm' || currentGesture === 'twoFingers') {

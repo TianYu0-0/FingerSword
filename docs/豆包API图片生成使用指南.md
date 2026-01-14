@@ -77,7 +77,7 @@ $response = Invoke-RestMethod -Uri "https://ark.cn-beijing.volces.com/api/v3/ima
 $imageUrl = $response.data[0].url
 
 # 下载图片
-Invoke-WebRequest -Uri $imageUrl -OutFile "output.jpg"
+Invoke-WebRequest -Uri $imageUrl -OutFile "output.png"
 
 Write-Host "图片生成完成！"
 ```
@@ -121,7 +121,7 @@ foreach ($img in $images) {
         
         # 下载图片
         $imageUrl = $response.data[0].url
-        $outputFile = Join-Path $outputDir "$($img.id).jpg"
+        $outputFile = Join-Path $outputDir "$($img.id).png"
         Invoke-WebRequest -Uri $imageUrl -OutFile $outputFile
         
         Write-Host "  ✓ 完成: $outputFile" -ForegroundColor Green
@@ -242,7 +242,7 @@ Chinese ancient jade artifact, exquisite carving, warm luster, delicate texture,
 ## 最佳实践
 
 1. **提前规划**：列出所有需要生成的图片清单
-2. **统一命名**：使用规范的文件命名方式（如：story_s1.jpg）
+2. **统一命名**：使用规范的文件命名方式（如：story_s1.png）
 3. **批量处理**：使用脚本批量生成，提高效率
 4. **错误处理**：添加try-catch捕获异常，记录失败项
 5. **进度显示**：输出生成进度，便于监控
