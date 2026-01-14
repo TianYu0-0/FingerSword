@@ -6,7 +6,7 @@ import { useTutorial } from '~/composables/useTutorial'
 
 const showHelp = ref(false)
 const showModeSelector = ref(false)
-const controlMode = ref<'mouse' | 'gesture'>('mouse')  // 教程默认鼠标模式
+const controlMode = ref<'mouse' | 'gesture'>('gesture')  // 默认手势模式
 const showGesturePanel = ref(false)
 const videoRef = ref<HTMLVideoElement | null>(null)
 const gameCanvasRef = ref<InstanceType<typeof GameCanvas> | null>(null)
