@@ -8,12 +8,13 @@ import { useLevel } from '~/composables/useLevel'
 const route = useRoute()
 const levelId = computed(() => route.query.level as string || null)
 const isTutorialMode = computed(() => levelId.value === 'tutorial')
-const isSlayMonsterMode = computed(() => levelId.value === 'slayMonster')
+const isLevelMode = computed(() => levelId.value && levelId.value !== 'tutorial')
 
 const showHelp = ref(false)
 const showModeSelector = ref(false)
 const controlMode = ref<'mouse' | 'gesture'>('gesture')  // 默认为手势模式
 const showGesturePanel = ref(false)
+const isGesturePanelMinimized = ref(false)  // 手势面板是否最小化
 const videoRef = ref<HTMLVideoElement | null>(null)
 const gameCanvasRef = ref<InstanceType<typeof GameCanvas> | null>(null)
 const containerRef = ref<HTMLDivElement | null>(null)
@@ -68,6 +69,9 @@ const {
 const showLevelResult = ref(false)
 const levelResult = ref<{ score: number; kills: number; maxCombo: number; success: boolean } | null>(null)
 
+// 关卡引导
+const showLevelGuide = ref(false)
+
 // 敌人生成定时器
 let spawnTimer: ReturnType<typeof setInterval> | null = null
 let gameLoopTimer: ReturnType<typeof setInterval> | null = null
@@ -82,29 +86,14 @@ onMounted(() => {
     })
   }
 
-  // 御剑斩妖模式初始化
-  if (isSlayMonsterMode.value) {
-    startLevel('slayMonster')
+  // 其他关卡模式初始化
+  if (levelId.value && levelId.value !== 'tutorial') {
+    // 先启动关卡以加载配置
+    startLevel(levelId.value as any)
 
-    // 敌人生成定时器
-    spawnTimer = setInterval(() => {
-      if (levelState.value.isPlaying && !levelState.value.isPaused) {
-        spawnEnemy(window.innerWidth, window.innerHeight)
-      }
-    }, 1500)
-
-    // 游戏循环（更新时间和敌人）
-    gameLoopTimer = setInterval(() => {
-      if (levelState.value.isPlaying && !levelState.value.isPaused) {
-        updateTime(0.1)  // 每100ms更新一次
-        updateEnemies(0.1, window.innerWidth, window.innerHeight)  // 更新敌人位置
-
-        // 检查时间是否结束
-        if (levelState.value.timeRemaining <= 0) {
-          handleLevelEnd()
-        }
-      }
-    }, 100)
+    // 显示关卡引导，暂停游戏
+    showLevelGuide.value = true
+    levelState.value.isPaused = true
   }
 
   // 自动初始化手势模式
@@ -143,25 +132,38 @@ const handleEnemyHit = (enemyId: string) => {
 const retryLevel = () => {
   showLevelResult.value = false
   levelResult.value = null
-  
-  if (isSlayMonsterMode.value) {
-    startLevel('slayMonster')
-    
-    spawnTimer = setInterval(() => {
-      if (levelState.value.isPlaying && !levelState.value.isPaused) {
-        spawnEnemy(window.innerWidth, window.innerHeight)
-      }
-    }, 1500)
-    
-    gameLoopTimer = setInterval(() => {
-      if (levelState.value.isPlaying && !levelState.value.isPaused) {
-        updateTime(0.1)
-        updateEnemies(0.1, window.innerWidth, window.innerHeight)
-        if (levelState.value.timeRemaining <= 0) {
-          handleLevelEnd()
+
+  if (levelId.value) {
+    startLevel(levelId.value as any)
+
+    // 御剑斩妖模式需要敌人生成
+    if (levelId.value === 'slayMonster') {
+      spawnTimer = setInterval(() => {
+        if (levelState.value.isPlaying && !levelState.value.isPaused) {
+          spawnEnemy(window.innerWidth, window.innerHeight)
         }
-      }
-    }, 100)
+      }, 1500)
+
+      gameLoopTimer = setInterval(() => {
+        if (levelState.value.isPlaying && !levelState.value.isPaused) {
+          updateTime(0.1)
+          updateEnemies(0.1, window.innerWidth, window.innerHeight)
+          if (levelState.value.timeRemaining <= 0) {
+            handleLevelEnd()
+          }
+        }
+      }, 100)
+    } else {
+      // 其他关卡只需要时间更新
+      gameLoopTimer = setInterval(() => {
+        if (levelState.value.isPlaying && !levelState.value.isPaused) {
+          updateTime(0.1)
+          if (levelState.value.timeRemaining <= 0) {
+            handleLevelEnd()
+          }
+        }
+      }, 100)
+    }
   }
 }
 
@@ -353,6 +355,50 @@ const closeGesturePanel = () => {
   }
 }
 
+// 切换手势面板最小化
+const toggleGesturePanelMinimize = () => {
+  isGesturePanelMinimized.value = !isGesturePanelMinimized.value
+}
+
+// 开始关卡
+const startLevelGame = () => {
+  showLevelGuide.value = false
+
+  // 恢复游戏
+  levelState.value.isPaused = false
+
+  if (levelId.value) {
+    // 御剑斩妖模式需要敌人生成
+    if (levelId.value === 'slayMonster') {
+      spawnTimer = setInterval(() => {
+        if (levelState.value.isPlaying && !levelState.value.isPaused) {
+          spawnEnemy(window.innerWidth, window.innerHeight)
+        }
+      }, 1500)
+
+      gameLoopTimer = setInterval(() => {
+        if (levelState.value.isPlaying && !levelState.value.isPaused) {
+          updateTime(0.1)
+          updateEnemies(0.1, window.innerWidth, window.innerHeight)
+          if (levelState.value.timeRemaining <= 0) {
+            handleLevelEnd()
+          }
+        }
+      }, 100)
+    } else {
+      // 其他关卡只需要时间更新
+      gameLoopTimer = setInterval(() => {
+        if (levelState.value.isPlaying && !levelState.value.isPaused) {
+          updateTime(0.1)
+          if (levelState.value.timeRemaining <= 0) {
+            handleLevelEnd()
+          }
+        }
+      }, 100)
+    }
+  }
+}
+
 // 手势状态变化时处理动作
 watch(gestureState, (newState) => {
   if (controlMode.value === 'gesture' && isInitialized.value) {
@@ -373,15 +419,16 @@ watch(gestureState, (newState) => {
 
 <template>
   <div ref="containerRef" class="game-container">
-    <GameCanvas 
-      ref="gameCanvasRef" 
-      class="canvas-layer" 
+    <GameCanvas
+      ref="gameCanvasRef"
+      class="canvas-layer"
       :gesture-mode="controlMode === 'gesture'"
       :tutorial-mode="isTutorialMode"
-      :level-mode="isSlayMonsterMode"
+      :level-mode="isLevelMode"
       :enemies="levelState.enemies"
       :target-position="targetPosition"
       :show-target="showTarget"
+      :trail="levelConfig?.trail"
       @sword-move="(pos: { x: number; y: number }) => handleTutorialAction('move', pos)"
       @sword-slash="() => handleTutorialAction('slash')"
       @sword-charge="(data: { chargeLevel: number }) => handleTutorialAction('charge', data)"
@@ -496,9 +543,12 @@ watch(gestureState, (newState) => {
     
     <!-- 手势控制面板 -->
     <Transition name="fade">
-      <div v-if="showGesturePanel" class="gesture-panel ink-card">
-        <h3 class="panel-title">手势控制</h3>
-        
+      <div v-show="showGesturePanel && !isGesturePanelMinimized" class="gesture-panel ink-card">
+        <div class="panel-header">
+          <h3 class="panel-title">手势控制</h3>
+          <button class="minimize-btn" @click="toggleGesturePanelMinimize" title="最小化">−</button>
+        </div>
+
         <!-- 权限引导 -->
         <div v-if="permissionStatus === 'denied'" class="permission-guide">
           <div class="permission-icon">🚫</div>
@@ -511,7 +561,7 @@ watch(gestureState, (newState) => {
             <li>刷新页面重试</li>
           </ol>
         </div>
-        
+
         <!-- 摄像头预览 -->
         <div v-else class="camera-preview">
           <video ref="videoRef" class="gesture-video" autoplay playsinline muted />
@@ -552,7 +602,7 @@ watch(gestureState, (newState) => {
             </div>
           </div>
         </div>
-        
+
         <div class="gesture-tips">
           <p>👆 食指指向 - 控制剑位置</p>
           <p>✌️ 双指并拢保持3秒 - 聚剑</p>
@@ -563,7 +613,67 @@ watch(gestureState, (newState) => {
         <button class="close-btn" @click="closeGesturePanel">关闭</button>
       </div>
     </Transition>
-    
+
+    <!-- 最小化的手势面板按钮 -->
+    <Transition name="fade">
+      <button
+        v-if="showGesturePanel && isGesturePanelMinimized"
+        class="gesture-panel-minimized ink-card"
+        @click="toggleGesturePanelMinimize"
+        title="展开手势控制面板"
+      >
+        <span class="gesture-icon">👋</span>
+        <span class="gesture-label">手势</span>
+      </button>
+    </Transition>
+
+    <!-- 关卡引导面板 -->
+    <Transition name="fade">
+      <div v-if="showLevelGuide && levelConfig" class="level-guide-overlay">
+        <div class="level-guide-panel ink-card">
+          <h2 class="guide-title">{{ levelConfig.name }}</h2>
+          <p class="guide-description">{{ levelConfig.description }}</p>
+
+          <div class="guide-info">
+            <div class="info-item">
+              <span class="info-label">难度:</span>
+              <span class="info-value">{{ '⭐'.repeat(levelConfig.difficulty) }}</span>
+            </div>
+            <div class="info-item" v-if="levelConfig.duration > 0">
+              <span class="info-label">时间:</span>
+              <span class="info-value">{{ levelConfig.duration }}秒</span>
+            </div>
+            <div class="info-item" v-if="levelConfig.targetScore > 0">
+              <span class="info-label">目标:</span>
+              <span class="info-value">{{ levelConfig.targetScore }}分</span>
+            </div>
+          </div>
+
+          <div class="guide-instructions">
+            <h3 class="instructions-title">玩法说明</h3>
+            <div v-if="levelId === 'swordTrail'" class="instructions-content">
+              <p>🎯 沿着轨迹移动剑，保持在轨迹范围内</p>
+              <p>📏 越精准得分越高</p>
+              <p>⏱️ 在限定时间内获得目标分数</p>
+            </div>
+            <div v-else-if="levelId === 'slayMonster'" class="instructions-content">
+              <p>⚔️ 击杀屏幕上出现的妖怪</p>
+              <p>🔥 连击可以获得额外分数</p>
+              <p>⏱️ 在限定时间内达到目标分数</p>
+            </div>
+            <div v-else class="instructions-content">
+              <p>完成关卡挑战，达到目标分数</p>
+            </div>
+          </div>
+
+          <div class="guide-actions">
+            <button class="start-btn ink-card" @click="startLevelGame">开始挑战</button>
+            <NuxtLink to="/levels" class="back-link">返回关卡选择</NuxtLink>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
     <Transition name="fade">
       <div v-if="showHelp" class="help-panel ink-card">
         <h3 class="help-title">操作说明</h3>
@@ -779,11 +889,65 @@ watch(gestureState, (newState) => {
   width: 280px;
 }
 
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
 .panel-title {
   font-family: 'ZCOOL XiaoWei', serif;
   font-size: 1.125rem;
   color: #1A1A1A;
-  margin-bottom: 0.75rem;
+  margin: 0;
+}
+
+.minimize-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6B6B6B;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  line-height: 1;
+  transition: all 0.2s;
+}
+
+.minimize-btn:hover {
+  color: #1A1A1A;
+  background: rgba(107, 107, 107, 0.1);
+  border-radius: 4px;
+}
+
+.gesture-panel-minimized {
+  position: absolute;
+  top: 5rem;
+  left: 1rem;
+  z-index: 20;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.gesture-panel-minimized:hover {
+  background-color: rgba(107, 107, 107, 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(26, 26, 26, 0.1);
+}
+
+.gesture-icon {
+  font-size: 1.25rem;
+}
+
+.gesture-label {
+  font-family: 'ZCOOL XiaoWei', serif;
+  font-size: 0.875rem;
+  color: #1A1A1A;
 }
 
 .gesture-video {
@@ -938,6 +1102,146 @@ watch(gestureState, (newState) => {
 
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
+}
+
+/* 关卡引导面板 */
+.level-guide-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(26, 26, 26, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 2rem;
+}
+
+.level-guide-panel {
+  max-width: 500px;
+  width: 100%;
+  padding: 2rem;
+  text-align: center;
+}
+
+.guide-title {
+  font-family: 'ZCOOL XiaoWei', serif;
+  font-size: 2rem;
+  color: #1A1A1A;
+  margin: 0 0 0.5rem 0;
+}
+
+.guide-description {
+  font-size: 1rem;
+  color: #6B6B6B;
+  margin: 0 0 1.5rem 0;
+}
+
+.guide-info {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: rgba(107, 107, 107, 0.05);
+  border-radius: 8px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.info-label {
+  font-size: 0.75rem;
+  color: #6B6B6B;
+}
+
+.info-value {
+  font-size: 1rem;
+  color: #1A1A1A;
+  font-weight: 500;
+}
+
+.guide-instructions {
+  text-align: left;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: rgba(196, 30, 58, 0.05);
+  border-radius: 8px;
+  border-left: 3px solid #C41E3A;
+}
+
+.instructions-title {
+  font-family: 'ZCOOL XiaoWei', serif;
+  font-size: 1.125rem;
+  color: #1A1A1A;
+  margin: 0 0 1rem 0;
+}
+
+.instructions-content p {
+  font-size: 0.875rem;
+  color: #1A1A1A;
+  margin: 0.5rem 0;
+  line-height: 1.6;
+}
+
+.guide-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.start-btn {
+  padding: 0.75rem 2rem;
+  font-size: 1.125rem;
+  font-family: 'ZCOOL XiaoWei', serif;
+  color: #F5F0E6;
+  background: #C41E3A;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.start-btn:hover {
+  background: #A01830;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(196, 30, 58, 0.3);
+}
+
+.back-link {
+  font-size: 0.875rem;
+  color: #6B6B6B;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.back-link:hover {
+  color: #1A1A1A;
+}
+
+@media (max-width: 768px) {
+  .level-guide-overlay {
+    padding: 1rem;
+  }
+
+  .level-guide-panel {
+    padding: 1.5rem;
+  }
+
+  .guide-title {
+    font-size: 1.5rem;
+  }
+
+  .guide-info {
+    flex-direction: column;
+    gap: 1rem;
+  }
 }
 
 /* 教程引导样式 */

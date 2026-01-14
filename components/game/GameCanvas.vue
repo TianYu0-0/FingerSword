@@ -15,6 +15,11 @@ const props = defineProps<{
   enemies?: Enemy[]
   targetPosition?: { x: number; y: number }
   showTarget?: boolean
+  trail?: {
+    points: { x: number; y: number }[]
+    width: number
+    loop: boolean
+  }
 }>()
 
 // Emits
@@ -460,9 +465,11 @@ const render = (timestamp: number) => {
   drawChargeIndicator(ctx)
   drawGatherSwords(ctx)
   drawShield(ctx)
+  drawTrailPath(ctx)  // 轨迹路径
   drawTutorialTarget(ctx)  // 教程目标
   drawEnemies(ctx)  // 关卡敌人
   checkEnemyCollision()  // 碰撞检测
+  checkTrailFollow()  // 轨迹跟随检测
   drawSword(ctx)
   drawComboIndicator(ctx)
   
@@ -531,23 +538,142 @@ const drawEnemies = (ctx: CanvasRenderingContext2D) => {
 // 检测剑与敌人碰撞
 const checkEnemyCollision = () => {
   if (!props.levelMode || !props.enemies) return
-  
-  const swordPos = sword.value.position
-  const swordSize = 40  // 剑的碰撞半径
-  
-  props.enemies.forEach(enemy => {
-    if (!enemy.isAlive) return
-    
-    const dx = enemy.position.x - swordPos.x
-    const dy = enemy.position.y - swordPos.y
-    const distance = Math.sqrt(dx * dx + dy * dy)
-    
-    if (distance < (enemy.size + swordSize) / 2) {
-      emit('enemy-hit', enemy.id)
-      emitInkSplash(enemy.position.x, enemy.position.y, 15)
-      playSound('slash')
-    }
+
+  const hitEnemies = new Set<string>() // 防止同一帧多次命中同一敌人
+
+  // 1. 检测主剑的基础碰撞（普通移动时）
+  if (!attackState.value.isAttacking) {
+    const swordPos = sword.value.position
+    const swordSize = 40  // 剑的碰撞半径
+
+    props.enemies.forEach(enemy => {
+      if (!enemy.isAlive || hitEnemies.has(enemy.id)) return
+
+      const dx = enemy.position.x - swordPos.x
+      const dy = enemy.position.y - swordPos.y
+      const distance = Math.sqrt(dx * dx + dy * dy)
+
+      if (distance < (enemy.size + swordSize) / 2) {
+        hitEnemies.add(enemy.id)
+        emit('enemy-hit', enemy.id)
+        emitInkSplash(enemy.position.x, enemy.position.y, 15)
+        playSound('slash')
+      }
+    })
+  }
+
+  // 2. 检测特效的碰撞（技能攻击）
+  effects.value.forEach(effect => {
+    props.enemies.forEach(enemy => {
+      if (!enemy.isAlive || hitEnemies.has(enemy.id)) return
+
+      let isHit = false
+
+      if (effect.type === 'chargeBlast') {
+        // 蓄力斩：圆形范围伤害
+        const dx = enemy.position.x - effect.position.x
+        const dy = enemy.position.y - effect.position.y
+        const distance = Math.sqrt(dx * dx + dy * dy)
+
+        if (distance < effect.size + enemy.size / 2) {
+          isHit = true
+        }
+      } else if (effect.type === 'thrust') {
+        // 瞬移突刺：路径伤害（矩形区域）
+        const angle = Math.atan2(effect.direction.y, effect.direction.x)
+
+        // 将敌人位置转换到突刺的局部坐标系
+        const dx = enemy.position.x - effect.position.x
+        const dy = enemy.position.y - effect.position.y
+
+        // 旋转到突刺方向的坐标系
+        const localX = dx * Math.cos(-angle) - dy * Math.sin(-angle)
+        const localY = dx * Math.sin(-angle) + dy * Math.cos(-angle)
+
+        // 检测是否在突刺路径的矩形范围内
+        const thrustLength = effect.size * 3  // 突刺长度
+        const thrustWidth = effect.size  // 突刺宽度
+
+        if (localX >= -effect.size * 2 && localX <= thrustLength &&
+            Math.abs(localY) <= thrustWidth / 2 + enemy.size / 2) {
+          isHit = true
+        }
+      } else if (effect.type === 'swordRain') {
+        // 万剑齐发：每把小剑的位置
+        const progress = effect.age / effect.maxAge
+        const speed = 800
+        const distance = progress * speed
+
+        // 计算小剑当前位置
+        const swordX = effect.position.x + effect.direction.x * distance
+        const swordY = effect.position.y + effect.direction.y * distance
+
+        const dx = enemy.position.x - swordX
+        const dy = enemy.position.y - swordY
+        const dist = Math.sqrt(dx * dx + dy * dy)
+
+        if (dist < 30 + enemy.size / 2) {  // 小剑的碰撞半径
+          isHit = true
+        }
+      }
+
+      if (isHit) {
+        hitEnemies.add(enemy.id)
+        emit('enemy-hit', enemy.id)
+        emitInkSplash(enemy.position.x, enemy.position.y, 15)
+        playSound('slash')
+      }
+    })
   })
+}
+
+// 轨迹跟随检测
+const trailFollowState = ref({
+  currentPointIndex: 0,
+  totalDistance: 0,
+  accuracy: 0,
+  lastCheckTime: 0
+})
+
+const checkTrailFollow = () => {
+  if (!props.trail || !props.trail.points || props.trail.points.length < 2) return
+
+  const swordPos = sword.value.position
+  const { points, width } = props.trail
+  const now = Date.now()
+
+  // 每100ms检测一次
+  if (now - trailFollowState.value.lastCheckTime < 100) return
+  trailFollowState.value.lastCheckTime = now
+
+  // 找到最近的轨迹点
+  let minDistance = Infinity
+  let closestIndex = 0
+
+  for (let i = 0; i < points.length; i++) {
+    const dx = swordPos.x - points[i].x
+    const dy = swordPos.y - points[i].y
+    const distance = Math.sqrt(dx * dx + dy * dy)
+
+    if (distance < minDistance) {
+      minDistance = distance
+      closestIndex = i
+    }
+  }
+
+  // 检测是否在轨迹范围内
+  if (minDistance <= width / 2) {
+    // 在轨迹上，增加分数
+    trailFollowState.value.totalDistance += 1
+    trailFollowState.value.accuracy = Math.min(100, (1 - minDistance / (width / 2)) * 100)
+
+    // 触发得分事件（可以在这里添加）
+    if (trailFollowState.value.totalDistance % 10 === 0) {
+      emitInkSplash(swordPos.x, swordPos.y, 8)
+    }
+  }
+
+  trailFollowState.value.currentPointIndex = closestIndex
 }
 
 // 绘制教程目标
@@ -595,6 +721,56 @@ const drawTutorialTarget = (ctx: CanvasRenderingContext2D) => {
   ctx.lineTo(x, y + radius)
   ctx.stroke()
   
+  ctx.restore()
+}
+
+// 绘制轨迹路径
+const drawTrailPath = (ctx: CanvasRenderingContext2D) => {
+  if (!props.trail || !props.trail.points || props.trail.points.length < 2) return
+
+  const { points, width, loop } = props.trail
+  const time = Date.now() * 0.001
+
+  ctx.save()
+
+  // 绘制轨迹路径（虚线）
+  ctx.strokeStyle = 'rgba(212, 165, 116, 0.4)'
+  ctx.lineWidth = width
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.setLineDash([20, 10])
+  ctx.lineDashOffset = -time * 30  // 流动效果
+
+  ctx.beginPath()
+  ctx.moveTo(points[0].x, points[0].y)
+
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y)
+  }
+
+  if (loop) {
+    ctx.lineTo(points[0].x, points[0].y)
+  }
+
+  ctx.stroke()
+
+  // 绘制路径点（小圆点）
+  ctx.setLineDash([])
+  ctx.fillStyle = 'rgba(212, 165, 116, 0.6)'
+
+  for (let i = 0; i < points.length; i += 5) {  // 每5个点绘制一个
+    const point = points[i]
+    ctx.beginPath()
+    ctx.arc(point.x, point.y, 4, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // 绘制起点标记
+  ctx.fillStyle = CONFIG.vermilion
+  ctx.beginPath()
+  ctx.arc(points[0].x, points[0].y, 8, 0, Math.PI * 2)
+  ctx.fill()
+
   ctx.restore()
 }
 
@@ -646,7 +822,7 @@ const drawGatherSwords = (ctx: CanvasRenderingContext2D) => {
   gatherState.value.swords.forEach(s => {
     ctx.save()
     ctx.translate(s.x, s.y)
-    ctx.rotate(s.angle)
+    ctx.rotate(s.angle + Math.PI / 2)
     ctx.globalAlpha = 0.8
     
     // 使用图片绘制剑（图片分辨率 235x1212，剑尖向上）

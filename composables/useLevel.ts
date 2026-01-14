@@ -31,6 +31,11 @@ export type LevelConfig = {
     spawnInterval: number  // 毫秒
     maxCount: number
   }
+  trail?: {
+    points: Vector2D[]  // 轨迹路径点
+    width: number  // 轨迹宽度
+    loop: boolean  // 是否循环
+  }
 }
 
 export type LevelState = {
@@ -90,6 +95,33 @@ const saveLevelStatus = (status: Record<LevelId, LevelStatus>) => {
   }
 }
 
+let generateId = () => Math.random().toString(36).substr(2, 9)
+
+// 生成圆形轨迹
+const generateCircleTrail = (centerX: number, centerY: number, radius: number, pointCount: number): Vector2D[] => {
+  const points: Vector2D[] = []
+  for (let i = 0; i < pointCount; i++) {
+    const angle = (i / pointCount) * Math.PI * 2
+    points.push({
+      x: centerX + Math.cos(angle) * radius,
+      y: centerY + Math.sin(angle) * radius
+    })
+  }
+  return points
+}
+
+// 生成S形轨迹
+const generateSTrail = (startX: number, startY: number, width: number, height: number, pointCount: number): Vector2D[] => {
+  const points: Vector2D[] = []
+  for (let i = 0; i < pointCount; i++) {
+    const t = i / (pointCount - 1)
+    const x = startX + t * width
+    const y = startY + Math.sin(t * Math.PI * 2) * height / 2
+    points.push({ x, y })
+  }
+  return points
+}
+
 const levelConfigs: Record<LevelId, LevelConfig> = {
   tutorial: {
     id: 'tutorial',
@@ -116,7 +148,12 @@ const levelConfigs: Record<LevelId, LevelConfig> = {
     difficulty: 2,
     duration: 90,
     targetScore: 800,
-    enemies: { types: ['target'], spawnInterval: 0, maxCount: 0 }
+    enemies: { types: ['target'], spawnInterval: 0, maxCount: 0 },
+    trail: {
+      points: generateCircleTrail(400, 300, 150, 60),  // 圆形轨迹
+      width: 40,
+      loop: true
+    }
   },
   swordRain: {
     id: 'swordRain',
@@ -137,8 +174,6 @@ const levelConfigs: Record<LevelId, LevelConfig> = {
     enemies: { types: ['projectile'], spawnInterval: 800, maxCount: 10 }
   }
 }
-
-let generateId = () => Math.random().toString(36).substr(2, 9)
 
 export function useLevel() {
   const state = ref<LevelState>({

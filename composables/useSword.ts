@@ -406,14 +406,14 @@ export function useSword() {
     gatherState.value.isGathering = false
     gatherState.value.swords = []
 
-    // 为每把聚集的剑添加特效，使用每把剑自己的朝向
+    // 为每把聚集的剑添加特效，所有剑使用主剑的朝向平行发射
     swordsToFire.forEach((s, i) => {
       setTimeout(() => {
-        // 使用每把剑自己的角度作为发射方向
-        const dirX = Math.cos(s.angle)
-        const dirY = Math.sin(s.angle)
+        // 使用主剑的方向作为发射方向（平行发射）
+        const dirX = mainDirection.x
+        const dirY = mainDirection.y
 
-        console.log('[swordRain] 发射剑', i, 'position:', s.x, s.y, 'angle:', s.angle)
+        console.log('[swordRain] 发射剑', i, 'position:', s.x, s.y, 'mainDirection:', mainDirection)
 
         effects.value.push({
           id: generateId(),
@@ -427,7 +427,7 @@ export function useSword() {
           extra: {
             startX: s.x,
             startY: s.y,
-            angle: s.angle  // 使用剑自己的角度
+            angle: sword.value.angle  // 使用主剑的角度
           }
         })
       }, i * 30) // 加快发射间隔
@@ -458,12 +458,12 @@ export function useSword() {
       const indexInRing = index % 8
       const angle = (indexInRing / 8) * Math.PI * 2 + ring * 0.3
       const radius = 60 + ring * 40  // 不同圈不同半径
-      
+
       gatherState.value.swords.push({
         id: generateId(),
         x: sword.value.position.x + Math.cos(angle) * radius,
         y: sword.value.position.y + Math.sin(angle) * radius,
-        angle: angle + Math.PI / 2
+        angle: sword.value.angle  // 使用主剑的朝向
       })
     }
 
@@ -476,7 +476,7 @@ export function useSword() {
       const radius = 60 + ring * 40
       s.x = sword.value.position.x + Math.cos(angle) * radius
       s.y = sword.value.position.y + Math.sin(angle) * radius
-      s.angle = angle + Math.PI / 2
+      s.angle = sword.value.angle  // 使用主剑的朝向
     })
   }
 
