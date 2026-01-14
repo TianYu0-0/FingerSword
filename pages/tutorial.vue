@@ -37,6 +37,7 @@ const {
   targetPosition,
   targetRadius,
   showTarget,
+  setControlMode,
   startTutorial,
   handleAction,
   generateTarget,
@@ -156,6 +157,8 @@ const selectControlMode = async (mode: 'mouse' | 'gesture') => {
     controlMode.value = mode
   }
 
+  // 更新教学系统的控制模式
+  setControlMode(mode)
   showModeSelector.value = false
 }
 
@@ -164,6 +167,7 @@ const closeGesturePanel = () => {
   showGesturePanel.value = false
   if (controlMode.value === 'gesture') {
     controlMode.value = 'mouse'
+    setControlMode('mouse')
     stop()
     resetGestureActions()
   }
@@ -203,7 +207,7 @@ watch(() => tutorialState.value.currentStep, (newStep, oldStep) => {
 })
 
 const handleStart = () => {
-  startTutorial()
+  startTutorial(controlMode.value)
   if (currentStepData.value?.requiredAction === 'move') {
     generateTarget(window.innerWidth, window.innerHeight)
   }

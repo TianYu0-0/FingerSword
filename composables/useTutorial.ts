@@ -2,7 +2,8 @@ export type TutorialStep = {
   id: string
   title: string
   description: string
-  instruction: string
+  mouseInstruction: string  // 鼠标模式指令
+  gestureInstruction: string  // 手势模式指令
   targetArea?: { x: number; y: number; radius: number }
   requiredAction: 'move' | 'slash' | 'charge' | 'thrust' | 'complete'
   successMessage: string
@@ -15,6 +16,7 @@ export type TutorialState = {
   isActive: boolean
   showOverlay: boolean
   completedSteps: string[]
+  controlMode: 'mouse' | 'gesture'  // 当前控制模式
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
@@ -22,7 +24,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'move',
     title: '御剑初成',
     description: '以意念引导仙剑',
-    instruction: '移动鼠标，将剑移至目标光圈处',
+    mouseInstruction: '移动鼠标，将剑移至目标光圈处',
+    gestureInstruction: '伸出食指指向，将剑移至目标光圈处',
     requiredAction: 'move',
     successMessage: '御剑初成！',
     isCompleted: false
@@ -31,7 +34,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'slash',
     title: '剑气凌厉',
     description: '释放剑气斩击',
-    instruction: '单击鼠标左键，释放剑气',
+    mouseInstruction: '单击鼠标左键，释放剑气',
+    gestureInstruction: '快速握拳再松开，释放剑气',
     requiredAction: 'slash',
     successMessage: '剑气凌厉！',
     isCompleted: false
@@ -40,7 +44,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'charge',
     title: '气贯长虹',
     description: '蓄力释放强力斩击',
-    instruction: '长按鼠标左键蓄力，松开释放',
+    mouseInstruction: '长按鼠标左键蓄力，松开释放',
+    gestureInstruction: '握拳保持3秒蓄力，张开手掌释放',
     requiredAction: 'charge',
     successMessage: '气贯长虹！',
     isCompleted: false
@@ -49,7 +54,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'thrust',
     title: '瞬影突刺',
     description: '瞬移突刺敌人',
-    instruction: '双击鼠标，剑将瞬移至点击位置',
+    mouseInstruction: '双击鼠标，剑将瞬移至点击位置',
+    gestureInstruction: '竖起大拇指，剑将瞬移突刺',
     requiredAction: 'thrust',
     successMessage: '瞬影突刺！',
     isCompleted: false
@@ -62,11 +68,21 @@ export function useTutorial() {
     steps: JSON.parse(JSON.stringify(TUTORIAL_STEPS)),
     isActive: false,
     showOverlay: true,
-    completedSteps: []
+    completedSteps: [],
+    controlMode: 'gesture'  // 默认手势模式
   })
 
   const currentStepData = computed(() => {
-    return state.value.steps[state.value.currentStep] || null
+    const step = state.value.steps[state.value.currentStep]
+    if (!step) return null
+
+    // 根据控制模式返回对应的指令
+    return {
+      ...step,
+      instruction: state.value.controlMode === 'mouse'
+        ? step.mouseInstruction
+        : step.gestureInstruction
+    }
   })
 
   const progress = computed(() => {
@@ -100,14 +116,20 @@ export function useTutorial() {
     return Math.hypot(dx, dy) < targetRadius.value
   }
 
+  // 设置控制模式
+  const setControlMode = (mode: 'mouse' | 'gesture') => {
+    state.value.controlMode = mode
+  }
+
   // 开始教学
-  const startTutorial = () => {
+  const startTutorial = (controlMode: 'mouse' | 'gesture' = 'gesture') => {
     state.value = {
       currentStep: 0,
       steps: JSON.parse(JSON.stringify(TUTORIAL_STEPS)),
       isActive: true,
       showOverlay: true,
-      completedSteps: []
+      completedSteps: [],
+      controlMode
     }
   }
 
@@ -141,7 +163,7 @@ export function useTutorial() {
       console.log('[useTutorial] 跳过：没有当前步骤')
       return
     }
-    
+
     console.log('[useTutorial] 当前步骤:', step.id, '需要动作:', step.requiredAction)
 
     switch (step.requiredAction) {
@@ -178,6 +200,7 @@ export function useTutorial() {
     targetPosition: readonly(targetPosition),
     targetRadius: readonly(targetRadius),
     showTarget: readonly(showTarget),
+    setControlMode,
     startTutorial,
     completeStep,
     skipTutorial,
