@@ -29,14 +29,14 @@ const statusClass = (status: string) => {
   <div class="levels-container">
     <header class="levels-header">
       <NuxtLink to="/" class="back-btn ink-card">← 返回</NuxtLink>
-      <h1 class="page-title">关卡选择</h1>
+      <h1 class="page-title ink-title">关卡选择</h1>
     </header>
 
     <div class="levels-grid">
       <NuxtLink
         v-for="level in levels"
         :key="level.id"
-        :to="level.status !== 'locked' ? `/game?level=${level.id}` : '#'"
+        :to="level.status !== 'locked' ? (level.id === 'tutorial' ? '/tutorial' : `/game?level=${level.id}`) : '#'"
         class="level-card ink-card"
         :class="[statusClass(level.status), { disabled: level.status === 'locked' }]"
       >
@@ -46,10 +46,10 @@ const statusClass = (status: string) => {
             {{ statusText(level.status) }}
           </span>
         </div>
-        
+
         <h2 class="level-name">{{ level.name }}</h2>
         <p class="level-description">{{ level.description }}</p>
-        
+
         <div class="level-info">
           <span v-if="level.duration > 0" class="level-duration">
             ⏱️ {{ level.duration }}秒
@@ -66,48 +66,76 @@ const statusClass = (status: string) => {
 <style scoped>
 .levels-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #1a1a2e 0%, #0f0f23 100%);
-  padding: 20px;
+  background-color: #F5F0E6;
+  padding: 2rem;
 }
 
 .levels-header {
   display: flex;
   align-items: center;
-  gap: 20px;
-  margin-bottom: 40px;
+  gap: 2rem;
+  margin-bottom: 3rem;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .back-btn {
-  padding: 10px 20px;
-  font-size: 16px;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
   text-decoration: none;
+  color: #1A1A1A;
+  transition: all 0.2s;
+}
+
+.back-btn:hover {
+  background-color: rgba(107, 107, 107, 0.1);
 }
 
 .page-title {
   font-family: 'ZCOOL XiaoWei', serif;
-  font-size: 36px;
-  color: #d4a574;
+  font-size: 2.5rem;
+  color: #1A1A1A;
   margin: 0;
 }
 
 .levels-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 24px;
+  gap: 2rem;
   max-width: 1200px;
   margin: 0 auto;
 }
 
 .level-card {
-  padding: 24px;
+  padding: 1.5rem;
   text-decoration: none;
   transition: all 0.3s ease;
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.level-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(196, 30, 58, 0.05) 0%, rgba(46, 74, 98, 0.05) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.level-card:hover:not(.disabled)::before {
+  opacity: 1;
 }
 
 .level-card:hover:not(.disabled) {
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(212, 165, 116, 0.3);
+  box-shadow: 0 8px 24px rgba(26, 26, 26, 0.15);
 }
 
 .level-card.disabled {
@@ -115,63 +143,104 @@ const statusClass = (status: string) => {
   cursor: not-allowed;
 }
 
+.level-card.disabled::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(107, 107, 107, 0.05) 10px,
+    rgba(107, 107, 107, 0.05) 20px
+  );
+  pointer-events: none;
+}
+
 .level-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 1rem;
 }
 
 .level-difficulty {
-  font-size: 14px;
+  font-size: 1rem;
 }
 
 .level-status {
-  font-size: 12px;
-  padding: 4px 8px;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
   border-radius: 4px;
+  font-weight: 500;
 }
 
 .status-locked {
-  color: #666;
-  background: rgba(102, 102, 102, 0.2);
+  color: #6B6B6B;
+  background: rgba(107, 107, 107, 0.1);
 }
 
 .status-unlocked {
-  color: #4CAF50;
-  background: rgba(76, 175, 80, 0.2);
+  color: #2E7D32;
+  background: rgba(46, 125, 50, 0.1);
 }
 
 .status-completed {
-  color: #FFD700;
-  background: rgba(255, 215, 0, 0.2);
+  color: #C41E3A;
+  background: rgba(196, 30, 58, 0.1);
 }
 
 .level-name {
   font-family: 'ZCOOL XiaoWei', serif;
-  font-size: 24px;
-  color: #f5f5f5;
-  margin: 0 0 8px 0;
+  font-size: 1.75rem;
+  color: #1A1A1A;
+  margin: 0 0 0.5rem 0;
+  font-weight: 600;
 }
 
 .level-description {
-  font-size: 14px;
-  color: #999;
-  margin: 0 0 16px 0;
-  line-height: 1.5;
+  font-size: 0.875rem;
+  color: #6B6B6B;
+  margin: 0 0 1rem 0;
+  line-height: 1.6;
 }
 
 .level-info {
   display: flex;
-  gap: 16px;
-  font-size: 13px;
-  color: #888;
+  gap: 1rem;
+  font-size: 0.8125rem;
+  color: #6B6B6B;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(26, 26, 26, 0.1);
 }
 
 .level-duration,
 .level-target {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0.25rem;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .levels-container {
+    padding: 1rem;
+  }
+
+  .levels-header {
+    margin-bottom: 2rem;
+  }
+
+  .page-title {
+    font-size: 2rem;
+  }
+
+  .levels-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
 }
 </style>
