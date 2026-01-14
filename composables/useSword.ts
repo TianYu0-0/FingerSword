@@ -373,7 +373,7 @@ export function useSword() {
   // 万剑归宗（右键长按释放）
   const swordRain = () => {
     console.log('[swordRain] 触发，isGathering:', gatherState.value.isGathering, 'swords:', gatherState.value.swords.length)
-    
+
     if (!gatherState.value.isGathering) {
       console.log('[swordRain] 未在聚剑状态，跳过')
       return
@@ -383,12 +383,12 @@ export function useSword() {
       return
     }
 
-    // 使用主剑的方向作为发射方向
+    // 使用主剑的方向作为基准方向
     const mainDirection = {
       x: Math.cos(sword.value.angle),
       y: Math.sin(sword.value.angle)
     }
-    console.log('[swordRain] 发射方向:', mainDirection, '剑数量:', gatherState.value.swords.length)
+    console.log('[swordRain] 主剑方向:', mainDirection, '剑数量:', gatherState.value.swords.length)
 
     attackState.value = {
       isAttacking: true,
@@ -406,16 +406,15 @@ export function useSword() {
     gatherState.value.isGathering = false
     gatherState.value.swords = []
 
-    // 为每把聚集的剑添加特效，全部沿主剑方向发射
+    // 为每把聚集的剑添加特效，使用每把剑自己的朝向
     swordsToFire.forEach((s, i) => {
       setTimeout(() => {
-        // 添加少量随机散布
-        const spread = (Math.random() - 0.5) * 0.3
-        const dirX = mainDirection.x + spread * mainDirection.y
-        const dirY = mainDirection.y - spread * mainDirection.x
-        
-        console.log('[swordRain] 发射剑', i, 'position:', s.x, s.y)
-        
+        // 使用每把剑自己的角度作为发射方向
+        const dirX = Math.cos(s.angle)
+        const dirY = Math.sin(s.angle)
+
+        console.log('[swordRain] 发射剑', i, 'position:', s.x, s.y, 'angle:', s.angle)
+
         effects.value.push({
           id: generateId(),
           type: 'swordRain',
@@ -425,10 +424,10 @@ export function useSword() {
           opacity: 1,
           age: 0,
           maxAge: 600,
-          extra: { 
-            startX: s.x, 
+          extra: {
+            startX: s.x,
             startY: s.y,
-            angle: Math.atan2(dirY, dirX)  // 保存发射角度
+            angle: s.angle  // 使用剑自己的角度
           }
         })
       }, i * 30) // 加快发射间隔
@@ -447,7 +446,7 @@ export function useSword() {
     if (!gatherState.value.isGathering) return
 
     const elapsed = Date.now() - gatherState.value.startTime
-    const maxSwords = 24  // 增加到24把剑
+    const maxSwords = 48  // 增加到48把剑（翻倍）
 
     // 每 100ms 添加一把剑（加快生成速度）
     const shouldHaveSwords = Math.min(maxSwords, Math.floor(elapsed / 100))
