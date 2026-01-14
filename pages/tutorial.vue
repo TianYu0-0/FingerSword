@@ -113,6 +113,7 @@ const setupGestureCallbacks = () => {
     },
     onSwordRain: () => {
       gameCanvasRef.value?.onRightMouseUp()
+      handleAction('swordRain')
     },
     onWave: () => {
       gameCanvasRef.value?.wave()

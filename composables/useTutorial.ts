@@ -5,7 +5,7 @@ export type TutorialStep = {
   mouseInstruction: string  // 鼠标模式指令
   gestureInstruction: string  // 手势模式指令
   targetArea?: { x: number; y: number; radius: number }
-  requiredAction: 'move' | 'slash' | 'charge' | 'thrust' | 'complete'
+  requiredAction: 'move' | 'slash' | 'charge' | 'thrust' | 'swordRain' | 'complete'
   successMessage: string
   isCompleted: boolean
 }
@@ -48,6 +48,16 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     gestureInstruction: '握拳保持3秒蓄力，张开手掌释放',
     requiredAction: 'charge',
     successMessage: '气贯长虹！',
+    isCompleted: false
+  },
+  {
+    id: 'swordRain',
+    title: '万剑齐发',
+    description: '聚剑后释放万剑',
+    mouseInstruction: '右键长按聚剑，松开释放万剑',
+    gestureInstruction: '双指并拢保持3秒聚剑，松开释放万剑',
+    requiredAction: 'swordRain',
+    successMessage: '万剑齐发！',
     isCompleted: false
   }
 ]
@@ -176,6 +186,11 @@ export function useTutorial() {
         break
       case 'thrust':
         if (action === 'thrust') {
+          completeStep()
+        }
+        break
+      case 'swordRain':
+        if (action === 'swordRain') {
           completeStep()
         }
         break
