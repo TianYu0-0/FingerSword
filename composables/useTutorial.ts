@@ -35,7 +35,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     title: '剑气凌厉',
     description: '释放剑气斩击',
     mouseInstruction: '单击鼠标左键，释放剑气',
-    gestureInstruction: '快速握拳再松开，释放剑气',
+    gestureInstruction: '食指快速移动，释放剑气',
     requiredAction: 'slash',
     successMessage: '剑气凌厉！',
     isCompleted: false
@@ -48,16 +48,6 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     gestureInstruction: '握拳保持3秒蓄力，张开手掌释放',
     requiredAction: 'charge',
     successMessage: '气贯长虹！',
-    isCompleted: false
-  },
-  {
-    id: 'thrust',
-    title: '瞬影突刺',
-    description: '瞬移突刺敌人',
-    mouseInstruction: '双击鼠标，剑将瞬移至点击位置',
-    gestureInstruction: '竖起大拇指，剑将瞬移突刺',
-    requiredAction: 'thrust',
-    successMessage: '瞬影突刺！',
     isCompleted: false
   }
 ]
