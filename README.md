@@ -4,6 +4,14 @@
 
 一款基于手势识别的仙侠风格互动游戏，用户可以通过鼠标或摄像头手势控制仙剑完成各种挑战任务。
 
+---
+
+## 🚀 技术支持
+
+**本项目由阿里云ESA提供加速、计算和保护**
+
+![阿里云 ESA Pages](./public/images/esa-banner.png)
+
 ## 在线体验
 
 🎮 **在线访问**: [https://game.tsyewz.top](https://game.tsyewz.top)
