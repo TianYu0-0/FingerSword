@@ -12,7 +12,7 @@
 
 **项目地址**: [https://game.tsyewz.top](https://game.tsyewz.top)
 
-![游戏截图](./public/images/game-screenshot.png)
+![游戏截图](./public/images/ScreenShot/game-screenshot.png)
 
 **部署平台**: 阿里云 ESA Pages
 **部署状态**: ✅ 已部署
